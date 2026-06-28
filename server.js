@@ -1,6 +1,7 @@
 require("dotenv").config();
 
 console.log("SESSION_SECRET =", process.env.SESSION_SECRET);
+console.log("DATABASE_URL =", process.env.DATABASE_URL ? "ADA" : "TIDAK ADA");
 
 const express = require("express");
 const session = require("express-session");
@@ -9,8 +10,20 @@ const fs = require("fs-extra");
 const path = require("path");
 const bcrypt = require("bcryptjs");
 const multer = require("multer");
+const { Pool } = require("pg");
 
 const app = express();
+
+const db = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
+});
+
+db.connect()
+  .then(() => console.log("PostgreSQL Connected"))
+  .catch(err => console.error(err));
 
 const PORT = process.env.PORT || 3000;
 
