@@ -33,11 +33,12 @@ app.use(express.urlencoded({
 app.use(
   session({
     secret: process.env.SESSION_SECRET,
+  "marketplaceid_v3_secret_key",
     resave: false,
     saveUninitialized: false
   })
 );
- 
+
 app.use(async(req,res,next)=>{
 
 if(req.session?.userId){
