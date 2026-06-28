@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>Favorit</title>
+
+<link
+rel="stylesheet"
+href="/public/css/style.css"
+>
+
+</head>
+<body>
+
+<div class="container">
+
+<h2 class="section-title">
+❤️ Produk Favorit
+</h2>
+
+<div id="favorites">
+
+<div class="empty">
+Memuat favorit...
+</div>
+
+</div>
+
+</div>
+
+<script src="/public/js/config.js"></script>
+
+<script>
+
+async function loadFavorites(){
+
+try{
+
+const res =
+await fetch(
+API_URL + "/api/favorites",
+{
+credentials:"include"
+}
+);
+
+const data =
+await res.json();
+
+const container =
+document.getElementById(
+"favorites"
+);
+
+if(
+!data.products ||
+data.products.length===0
+){
+
+container.innerHTML=
+`
+<div class="empty">
+Belum ada favorit
+</div>
+`;
+
+return;
+
+}
+
+container.innerHTML="";
+
+data.products.forEach(
+product=>{
+
+const image =
+product.images &&
+product.images.length
+?
+product.images[0]
+:
+"/public/images/banner1.jpg";
+
+container.innerHTML+=`
+<div
+class="product-card"
+onclick="
+location.href=
+'/product?id=${product.id}'
+"
+>
+
+<img
+src="${image}"
+class="product-image"
+>
+
+<div class="product-body">
+
+<div class="product-title">
+${product.title}
+</div>
+
+<div class="product-price">
+Rp ${Number(
+product.price
+).toLocaleString("id-ID")}
+</div>
+
+<div class="product-location">
+📍 ${product.location}
+</div>
+
+<button
+style="
+width:100%;
+margin-top:10px;
+background:#ff3b3b;
+color:white;
+border:none;
+padding:10px;
+border-radius:10px;
+font-weight:bold;
+"
+onclick="
+event.stopPropagation();
+removeFavorite(${product.id})
+"
+>
+💔 Hapus Favorit
+</button>
+
+</div>
+
+</div>
+`;
+
+});
+
+}catch(err){
+
+console.log(err);
+
+}
+
+}
+
+async function removeFavorite(productId){
+
+if(
+!confirm(
+"Hapus dari favorit?"
+)
+){
+return;
+}
+
+try{
+
+const res =
+await fetch(
+API_URL + "/api/favorites/" + productId,
+{
+method:"DELETE",
+credentials:"include"
+}
+);
+
+const data =
+await res.json();
+
+if(data.success){
+
+loadFavorites();
+
+}else{
+
+alert(
+data.message ||
+"Gagal menghapus"
+);
+
+}
+
+}catch(err){
+
+console.log(err);
+
+}
+
+}
+
+loadFavorites();
+
+</script>
+
+</body>
+</html>

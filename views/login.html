@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Login - MarketplaceID</title>
+
+<link rel="stylesheet" href="/public/css/style.css">
+</head>
+
+<body>
+
+<div class="auth-container">
+
+<div class="auth-card">
+
+  <div class="auth-logo">
+    🛍️
+  </div>
+
+  <h1>
+    Marketplace<span>ID</span>
+  </h1>
+
+  <p class="auth-subtitle">
+    Tempat terbaik untuk jual beli aman
+    dan terpercaya
+  </p>
+
+  <input
+    id="login"
+    type="text"
+    placeholder="Username atau Email"
+  >
+
+  <input
+    id="password"
+    type="password"
+    placeholder="Password"
+  >
+
+  <button onclick="doLogin()">
+    Masuk
+  </button>
+
+  <p class="auth-link">
+    Belum punya akun?
+    <a href="/register">
+      Daftar Sekarang
+    </a>
+  </p>
+
+  <div class="auth-features">
+
+    <div>
+      🛡️ Aman
+    </div>
+
+    <div>
+      ⚡ Cepat
+    </div>
+
+    <div>
+      ⭐ Terpercaya
+    </div>
+
+  </div>
+
+</div>
+
+<script src="/public/js/auth.js"></script>
+
+<script>
+
+async function doLogin() {
+
+  const login =
+    document
+      .getElementById("login")
+      .value
+      .trim();
+
+  const password =
+    document
+      .getElementById("password")
+      .value
+      .trim();
+
+  if (
+    !login ||
+    !password
+  ) {
+
+    alert(
+      "Lengkapi data"
+    );
+
+    return;
+  }
+
+  const res =
+    await fetch(
+    API_URL + "/api/login",
+      {
+        method:"POST",
+
+        headers:{
+          "Content-Type":
+            "application/json"
+        },
+
+        body:JSON.stringify({
+          login,
+          password
+        })
+      }
+    );
+
+  const data =
+    await res.json();
+
+  if (
+    !data.success
+  ) {
+
+    alert(
+      data.message
+    );
+
+    return;
+  }
+
+  window.location.href =
+    "/home";
+}
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>Inbox</title>
+
+<link
+rel="stylesheet"
+href="/public/css/style.css"
+>
+
+<style>
+
+.chat-list{
+display:flex;
+flex-direction:column;
+gap:12px;
+}
+
+.chat-item{
+background:#0f1625;
+border:1px solid #1f2937;
+border-radius:18px;
+padding:12px;
+display:flex;
+align-items:center;
+gap:12px;
+cursor:pointer;
+}
+
+.chat-avatar{
+width:55px;
+height:55px;
+border-radius:50%;
+object-fit:cover;
+}
+
+.chat-name{
+font-weight:bold;
+}
+
+.chat-last{
+font-size:13px;
+color:#b8c0cc;
+margin-top:4px;
+}
+
+</style>
+
+</head>
+<body>
+
+<div class="container">
+
+<h2 class="section-title">
+💬 Inbox
+</h2>
+
+<div id="chatList">
+
+<div class="empty">
+Memuat chat...
+</div>
+
+</div>
+
+</div>
+
+<script src="/public/js/config.js"></script>
+
+<script>
+
+async function loadInbox(){
+
+try{
+
+const res =
+await fetch(
+API_URL + "/api/inbox",
+{
+credentials:"include"
+}
+);
+
+const data =
+await res.json();
+
+const container =
+document.getElementById(
+"chatList"
+);
+
+if(
+!data.chats ||
+data.chats.length===0
+){
+
+container.innerHTML=
+`
+<div class="empty">
+Belum ada pesan
+</div>
+`;
+
+return;
+
+}
+
+container.innerHTML="";
+
+data.chats.forEach(chat=>{
+
+let preview =
+chat.lastMessage || "";
+
+if(
+preview.startsWith(
+"[IMAGE]"
+)
+){
+preview = "🖼 Foto";
+}
+
+else if(
+preview.startsWith(
+"[PRODUCT]"
+)
+){
+preview = "📦 Produk";
+}
+
+else if(
+preview.startsWith(
+"[LOCATION]"
+)
+){
+preview = "📍 Lokasi";
+}
+
+else if(
+preview.startsWith(
+"[OFFER]"
+)
+){
+preview = "💰 Penawaran Harga";
+}
+
+else if(
+preview.includes(
+"[REPLY]"
+)
+){
+
+preview =
+preview.replace(
+/\[REPLY\].*?\[\/REPLY\]/,
+"↩ "
+);
+
+}
+
+container.innerHTML+=`
+
+<div
+class="chat-item"
+onclick="
+location.href=
+'/chat?userId=${chat.id}'
+"
+>
+
+<img
+src="${chat.avatar}"
+class="chat-avatar"
+>
+
+<div>
+
+<div
+class="chat-name"
+style="
+font-weight:
+${chat.unreadCount > 0 ? '900' : '700'};
+"
+>
+
+${chat.name}
+
+${chat.unreadCount > 0 ?
+`
+<span style="
+background:#ff2d2d;
+color:white;
+min-width:24px;
+height:24px;
+display:inline-flex;
+align-items:center;
+justify-content:center;
+border-radius:50%;
+font-size:12px;
+font-weight:bold;
+margin-left:8px;
+box-shadow:
+0 0 10px rgba(255,45,45,.6);
+">
+${chat.unreadCount}
+</span>
+`
+:
+""
+}
+
+</div>
+
+<div class="chat-last">
+${preview}
+</div>
+
+<div style="
+font-size:12px;
+color:#888;
+margin-top:4px;
+">
+${new Date(
+chat.time
+).toLocaleTimeString(
+"id-ID",
+{
+hour:"2-digit",
+minute:"2-digit"
+}
+)}
+</div>
+
+</div>
+
+</div>
+`;
+
+});
+
+}catch(err){
+
+console.log(err);
+
+}
+
+}
+
+loadInbox();
+
+</script>
+
+</body>
+</html>

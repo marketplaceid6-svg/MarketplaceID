@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>MarketplaceID</title>
+
+<link rel="stylesheet" href="/public/css/style.css">
+</head>
+
+<body>
+
+<!-- HEADER -->
+
+<div class="header">
+
+<div class="logo">
+MARKETPLACE ID
+</div>
+
+<div
+id="notificationBtn"
+onclick="location.href='/notifications'"
+style="
+position:relative;
+cursor:pointer;
+font-size:24px;
+">
+
+🔔
+
+<span
+id="notificationBadge"
+style="
+display:none;
+position:absolute;
+top:-6px;
+right:-6px;
+background:#ff3b3b;
+color:white;
+font-size:11px;
+font-weight:bold;
+min-width:18px;
+height:18px;
+border-radius:50%;
+display:flex;
+align-items:center;
+justify-content:center;
+">
+0
+</span>
+
+</div>
+
+❤️
+
+</div>
+
+<!-- CONTENT -->
+
+<div class="container">
+
+<!-- SEARCH -->
+
+<div class="search-box">
+
+<input
+id="searchInput"
+type="text"
+placeholder="Cari produk, kategori atau toko..."
+>
+
+<span
+onclick="doSearch()"
+style="
+cursor:pointer;
+"
+>
+🔍
+</span>
+
+</div>
+
+<!-- BANNER -->
+
+<div class="banner">
+
+<h2>
+Temukan Barang Terbaik
+</h2>
+
+<p>
+Jual beli aman dan terpercaya
+</p>
+
+<a
+href="/add-product"
+class="banner-btn"
+>
+Jual Sekarang
+</a>
+
+</div>
+
+<!-- CATEGORY -->
+
+<div
+class="category"
+onclick="loadProducts()"
+>
+<div class="category-icon">🔥</div>
+<div class="category-name">Semua</div>
+</div>
+
+<div class="section-title">
+Kategori
+</div>
+
+<div class="categories">
+
+<div class="category"
+onclick="filterCategory('Elektronik')">
+<div class="category-icon">📱</div>
+<div class="category-name">Elektronik</div>
+</div>
+
+<div class="category"
+onclick="filterCategory('Mobil')">
+<div class="category-icon">🚗</div>
+<div class="category-name">Mobil</div>
+</div>
+
+<div class="category"
+onclick="filterCategory('Motor')">
+<div class="category-icon">🏍️</div>
+<div class="category-name">Motor</div>
+</div>
+
+<div class="category" 
+onclick="filterCategory('Rumah')">
+<div class="category-icon">🏠</div>
+<div class="category-name">Rumah</div>
+</div>
+
+<div class="category"
+onclick="filterCategory('Lainnya')">
+<div class="category-icon">⚙️</div>
+<div class="category-name">Lainnya</div>
+</div>
+
+</div>
+
+<!-- PRODUCTS -->
+
+<div class="section-title">
+Produk Terbaru
+</div>
+
+<div
+id="products"
+class="products"
+>
+
+<div class="empty">
+Memuat produk...
+</div>
+
+<div class="section-title">
+🔥 Rekomendasi Untuk Kamu
+</div>
+
+<div
+id="recommendProducts"
+class="products"
+>
+</div>
+
+</div>
+
+</div>
+
+<!-- BOTTOM NAV -->
+
+<div class="bottom-nav">
+
+<a class="active" href="/home">
+<div class="nav-icon">🏠</div>
+Beranda
+</a>
+
+<a href="/favorites">
+<div class="nav-icon">❤️</div>
+Favorit
+</a>
+
+<a href="/add-product">
+<div class="nav-add">+</div>
+</a>
+
+<a
+href="/inbox"
+style="
+position:relative;
+"
+>
+
+<div class="nav-icon">
+💬
+
+<span
+id="unreadBadge"
+style="
+display:none;
+position:absolute;
+top:-5px;
+right:-5px;
+background:#ff2d2d;
+color:white;
+min-width:18px;
+height:18px;
+border-radius:50%;
+font-size:10px;
+font-weight:bold;
+align-items:center;
+justify-content:center;
+box-shadow:
+0 0 10px rgba(255,0,0,.6);
+"
+>
+</span>
+
+</div>
+
+Chat
+
+</a>
+
+<a href="/profile">
+<div class="nav-icon">👤</div>
+Akun
+</a>
+
+</div>
+
+<script src="/public/js/config.js"></script>
+
+<script>
+
+async function loadProducts(){
+
+try{
+
+const res =
+await fetch(API_URL + "/api/home");
+
+const data =
+await res.json();
+
+const container =
+document.getElementById(
+"products"
+);
+
+if(
+!data.latest ||
+data.latest.length === 0
+){
+
+container.innerHTML =
+`
+<div class="empty">
+Belum ada produk
+</div>
+`;
+
+return;
+
+}
+
+container.innerHTML = "";
+
+data.latest.forEach(
+product => {
+
+const image =
+product.images &&
+product.images.length
+?
+product.images[0]
+:
+"/public/images/banner1.jpg";
+
+container.innerHTML +=
+`
+<div
+class="product-card"
+onclick="
+location.href=
+'/product?id=${product.id}'
+"
+>
+
+<img
+class="product-image"
+src="${image}"
+>
+
+${product.status==="sold" ? `
+<div class="sold-overlay">
+✓ TERJUAL
+</div>
+` : ""}
+
+</div>
+
+<div class="product-body">
+
+<div class="product-title">
+${product.title}
+</div>
+
+${product.oldPrice ?
+`
+<div style="
+display:inline-block;
+background:#ff3b3b;
+padding:4px 8px;
+border-radius:8px;
+font-size:12px;
+font-weight:bold;
+margin-bottom:8px;
+color:white;
+">
+-${Math.round(
+(
+(product.oldPrice-product.price)
+/product.oldPrice
+)*100
+)}%
+</div>
+
+<div style="
+text-decoration:line-through;
+color:#888;
+font-size:13px;
+margin-top:6px;
+">
+Rp ${Number(
+product.oldPrice
+).toLocaleString(
+'id-ID'
+)}
+</div>
+`
+:
+""
+}
+
+<div class="product-price">
+Rp ${Number(
+product.price
+).toLocaleString(
+'id-ID'
+)}
+</div>
+
+<div class="product-location">
+📍 ${
+product.location ||
+'Indonesia'
+}
+</div>
+
+<div class="product-footer">
+
+<span>
+👁 ${
+product.views || 0
+}
+</span>
+
+<button
+class="product-fav"
+onclick="
+event.stopPropagation();
+addFavorite(${product.id})
+"
+>
+❤️
+</button>
+
+</div>
+
+</div>
+
+</div>
+`;
+});
+
+}catch(err){
+
+console.log(err);
+
+}
+
+}
+
+async function filterCategory(category){
+
+try{
+
+const res =
+await fetch(API_URL + "/api/home");
+
+const data =
+await res.json();
+
+const container =
+document.getElementById(
+"products"
+);
+
+const filtered =
+data.latest.filter(
+p =>
+p.category &&
+p.category.toLowerCase() ===
+category.toLowerCase()
+);
+
+container.innerHTML = "";
+
+if(filtered.length === 0){
+
+container.innerHTML = `
+<div class="empty">
+Tidak ada produk kategori ${category}
+</div>
+`;
+
+return;
+
+}
+
+filtered.forEach(product=>{
+
+const image =
+product.images &&
+product.images.length
+?
+product.images[0]
+:
+"/public/images/banner1.jpg";
+
+container.innerHTML += `
+<div
+class="product-card"
+onclick="
+location.href='/product?id=${product.id}'
+"
+>
+
+<img
+class="product-image"
+src="${image}"
+>
+
+<div class="product-body">
+
+<div class="product-title">
+${product.title}
+</div>
+
+<div class="product-price">
+Rp ${Number(product.price).toLocaleString("id-ID")}
+</div>
+
+<div class="product-location">
+📍 ${product.location || "Indonesia"}
+</div>
+
+</div>
+
+</div>
+`;
+
+});
+
+}catch(err){
+
+console.log(err);
+
+}
+
+}
+
+async function loadRecommendProducts(){
+
+try{
+
+const res =
+await fetch(
+API_URL + "/api/home"
+);
+
+const data =
+await res.json();
+
+const container =
+document.getElementById(
+"recommendProducts"
+);
+
+if(
+!container
+)
+return;
+
+container.innerHTML = "";
+
+data.recommend.forEach(
+product=>{
+
+const image =
+product.images &&
+product.images.length
+?
+product.images[0]
+:
+"/public/images/banner1.jpg";
+
+container.innerHTML += `
+<div
+class="product-card"
+onclick="
+location.href=
+'/product?id=${product.id}'
+"
+>
+
+<img
+class="product-image"
+src="${image}"
+>
+
+<div class="product-body">
+
+<div class="product-title">
+${product.title}
+</div>
+
+<div class="product-price">
+Rp ${Number(
+product.price
+).toLocaleString(
+"id-ID"
+)}
+</div>
+
+</div>
+
+</div>
+`;
+
+});
+
+}catch(err){
+
+console.log(err);
+
+}
+
+}
+async function addFavorite(productId){
+
+try{
+
+const res =
+await fetch(
+API_URL + "/api/favorites/" + productId,
+{
+method:"POST",
+credentials:"include"
+}
+);
+
+const data =
+await res.json();
+
+if(data.success){
+
+alert(
+"Ditambahkan ke favorit ❤️"
+);
+
+}else{
+
+alert(
+data.message
+);
+
+}
+
+}catch(err){
+
+console.log(err);
+
+alert(
+"Gagal menambahkan favorit"
+);
+
+}
+
+}
+
+async function doSearch(){
+
+try{
+
+const keyword =
+document
+.getElementById("searchInput")
+.value
+.trim();
+
+if(!keyword){
+
+loadProducts();
+return;
+
+}
+
+const res =
+await fetch(
+API_URL + "/api/search?q=" +
+encodeURIComponent(keyword)
+);
+
+const data =
+await res.json();
+
+const container =
+document.getElementById(
+"products"
+);
+
+container.innerHTML = "";
+
+(data.products || [])
+.forEach(product=>{
+
+const image =
+product.images &&
+product.images.length
+?
+product.images[0]
+:
+"/public/images/banner1.jpg";
+
+container.innerHTML += `
+<div
+class="product-card"
+onclick="
+location.href='/product?id=${product.id}'
+"
+>
+
+<img
+class="product-image"
+src="${image}"
+>
+
+<div class="product-body">
+
+<div class="product-title">
+${product.title}
+</div>
+
+<div class="product-price">
+Rp ${Number(product.price)
+.toLocaleString("id-ID")}
+</div>
+
+<div class="product-location">
+📍 ${product.location || "Indonesia"}
+</div>
+
+</div>
+
+</div>
+`;
+
+});
+
+if(
+(data.products || []).length === 0
+){
+
+container.innerHTML = `
+<div class="empty">
+Produk tidak ditemukan
+</div>
+`;
+
+}
+
+}catch(err){
+
+console.log(err);
+
+}
+
+}
+
+loadProducts();
+loadRecommendProducts();
+
+async function loadUnread(){
+
+const res =
+await fetch(
+API_URL + "/api/notifications/unread",
+{
+credentials:"include"
+}
+);
+
+const data =
+await res.json();
+
+const badge =
+document.getElementById(
+"notificationBadge"
+);
+
+if(!badge)
+return;
+
+if(data.count > 0){
+
+badge.style.display =
+"flex";
+
+badge.innerText =
+data.count;
+
+}else{
+
+badge.style.display =
+"none";
+
+}
+
+}
+
+loadUnread();
+
+setInterval(
+loadUnread,
+5000
+);
+
+</script>
+
+</body>
+</html>

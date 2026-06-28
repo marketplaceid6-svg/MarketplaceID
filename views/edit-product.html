@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport"
+content="width=device-width,initial-scale=1">
+
+<link
+rel="stylesheet"
+href="/public/css/style.css">
+
+<title>Edit Produk</title>
+
+</head>
+<body>
+
+<div class="container">
+
+<h2 class="section-title">
+✏️ Edit Produk
+</h2>
+
+<input
+id="title"
+class="input"
+placeholder="Nama Produk">
+
+<input
+id="price"
+class="input"
+type="number"
+placeholder="Harga Baru">
+
+<textarea
+id="description"
+class="input textarea"
+placeholder="Deskripsi">
+</textarea>
+
+<button
+class="btn-submit"
+onclick="saveProduct()">
+Simpan Perubahan
+</button>
+
+</div>
+
+<button
+class="sold-btn"
+onclick="markSold()"
+>
+✅ Tandai Terjual
+</button>
+
+<script src="/public/js/config.js"></script>
+
+<script>
+
+const params =
+new URLSearchParams(
+window.location.search
+);
+
+const id =
+params.get("id");
+
+let oldPrice = 0;
+
+async function loadProduct(){
+
+try{
+
+const res =
+await fetch(
+API_URL + "/api/edit-product/" + id,
+{ 
+credentials:"include"
+}
+);
+
+const data =
+await res.json();
+
+if(!data.product){
+
+alert(
+"Produk tidak ditemukan"
+);
+
+location.href =
+"/my-products";
+
+return;
+
+}
+
+document.getElementById(
+"title"
+).value =
+data.product.title || "";
+
+document.getElementById(
+"price"
+).value =
+data.product.price || "";
+
+document.getElementById(
+"description"
+).value =
+data.product.description || "";
+
+oldPrice =
+data.product.price || 0;
+
+}catch(err){
+
+console.log(err);
+
+}
+
+}
+
+async function saveProduct(){
+
+try{
+
+const newPrice =
+Number(
+document.getElementById(
+"price"
+).value
+);
+
+const body = {
+
+title:
+document.getElementById(
+"title"
+).value,
+
+price:newPrice,
+
+description:
+document.getElementById(
+"description"
+).value
+
+};
+
+if(
+newPrice < oldPrice
+){
+
+body.oldPrice =
+oldPrice;
+
+}
+
+const res =
+await fetch(
+API_URL + "/api/edit-product/" + id,
+{
+method:"PUT",
+credentials:"include",
+headers:{
+"Content-Type":
+"application/json"
+},
+body:JSON.stringify(body)
+}
+);
+
+const data =
+await res.json();
+
+if(data.success){
+
+alert(
+"Produk berhasil diperbarui"
+);
+
+location.href =
+"/my-products";
+
+}else{
+
+alert(
+data.message
+);
+
+}
+
+}catch(err){
+
+console.log(err);
+
+}
+
+}
+
+async function markSold(){
+
+if(
+!confirm(
+"Yakin produk ini sudah terjual?"
+)
+)return;
+
+const res =
+await fetch(
+API_URL + "/api/products/"+id+"/sold",
+{
+method:"PUT",
+credentials:"include"
+}
+);
+
+const data =
+await res.json();
+
+if(data.success){
+
+alert(
+"Produk berhasil ditandai terjual."
+);
+
+location.reload();
+
+}else{
+
+alert(
+data.message ||
+"Gagal."
+);
+
+}
+
+}
+
+loadProduct();
+
+</script>
+
+</body>
+</html>

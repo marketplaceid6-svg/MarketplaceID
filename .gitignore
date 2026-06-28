@@ -1,0 +1,20 @@
+node_modules/
+
+.env
+
+# Uploads
+uploads/chat/*
+uploads/products/*
+uploads/profiles/*
+uploads/verifications/*
+uploads/temp/*
+
+# Database
+database/*.json
+
+# Backup
+backups/database/*
+
+# Logs
+logs/
+npm-debug.log

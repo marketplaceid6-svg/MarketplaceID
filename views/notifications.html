@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+
+<title>Notifikasi</title>
+
+<link rel="stylesheet" href="/public/css/style.css">
+
+<style>
+
+body{
+margin:0;
+background:#05070d;
+color:white;
+font-family:sans-serif;
+padding-bottom:80px;
+}
+
+.header{
+padding:20px;
+font-size:28px;
+font-weight:bold;
+position:sticky;
+top:0;
+z-index:100;
+background:#111827;
+padding:20px;
+}
+
+#notificationList{
+padding:20px;
+margin-top:10px;
+}
+
+.notification{
+background:#111827;
+margin:15px;
+padding:18px;
+border-radius:18px;
+cursor:pointer;
+transition:.2s;
+}
+
+.notification:hover{
+transform:scale(1.02);
+}
+
+.notification.unread{
+border:2px solid #ff3b3b;
+}
+
+.notification-title{
+font-size:17px;
+font-weight:bold;
+margin-bottom:8px;
+}
+
+.notification-time{
+font-size:13px;
+color:#999;
+}
+
+.empty{
+padding:100px 20px;
+text-align:center;
+color:#888;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="header">
+🔔 Notifikasi
+</div>
+
+<div id="notificationList">
+
+<div class="empty">
+Memuat...
+</div>
+
+</div>
+
+<script src="/public/js/config.js"></script>
+
+<script>
+
+async function loadNotifications(){
+
+try{
+
+const res=
+await fetch(
+API_URL + "/api/notifications",
+{
+credentials:"include"
+}
+);
+
+const data=
+await res.json();
+
+const container=
+document.getElementById(
+"notificationList"
+);
+
+if(
+!data.notifications ||
+data.notifications.length===0
+){
+
+container.innerHTML=
+`
+<div class="empty">
+Belum ada notifikasi
+</div>
+`;
+
+return;
+
+}
+
+container.innerHTML="";
+
+data.notifications.forEach(n=>{
+
+const waktu=
+new Date(
+n.createdAt
+).toLocaleString("id-ID");
+
+container.innerHTML+=`
+
+<div
+class="notification ${!n.read?"unread":""}"
+onclick="openNotification(${n.fromUserId})"
+>
+
+<div class="notification-title">
+
+${n.title || "Notifikasi"}
+
+</div>
+
+<div class="notification-message">
+
+${n.message || ""}
+
+</div>
+
+<div class="notification-time">
+
+${waktu}
+
+</div>
+
+${
+n.type==="product_disabled"
+&&
+!n.appealed
+?
+`
+<button
+class="btn-admin"
+onclick="event.stopPropagation();appealProduct(${n.productId})"
+>
+
+📨 Ajukan Banding
+
+</button>
+`
+:
+""
+}
+
+</div>
+
+`;
+
+});
+
+}catch(err){
+
+console.log(err);
+
+}
+
+}
+
+function openNotification(id){
+
+// Tandai sudah dibaca
+// Nanti kita tambahkan API read notification
+
+}
+
+async function appealProduct(productId){
+
+const reason=
+prompt(
+"Jelaskan alasan banding:"
+);
+
+if(!reason)return;
+
+const res=
+await fetch(
+API_URL + "/api/appeals",
+{
+method:"POST",
+credentials:"include",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+
+productId,
+
+reason
+
+})
+}
+);
+
+const data=
+await res.json();
+
+alert(data.message);
+
+if(data.success){
+
+loadNotifications();
+
+}
+
+}
+
+loadNotifications();
+
+</script>
+
+</body>
+</html>

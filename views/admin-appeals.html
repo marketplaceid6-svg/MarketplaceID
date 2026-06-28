@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Banding Produk</title>
+<link rel="stylesheet" href="/public/css/style.css">
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>📨 Banding Produk</h1>
+
+<div id="appealList">
+
+<div class="empty">
+Memuat banding...
+</div>
+
+</div>
+
+<button
+class="btn-back"
+onclick="location.href='/admin'"
+>
+
+⬅ Kembali
+
+</button>
+
+</div>
+
+<script src="/public/js/config.js"></script>
+
+<script>
+
+async function loadAppeals(){
+
+const res=
+await fetch(
+API_URL + "/api/admin/appeals",
+{
+credentials:"include"
+}
+);
+
+const data=
+await res.json();
+
+const list=
+document.getElementById(
+"appealList"
+);
+
+list.innerHTML="";
+
+if(
+!data.appeals||
+data.appeals.length===0
+){
+
+list.innerHTML=`
+<div class="empty">
+
+Belum ada banding
+
+</div>
+`;
+
+return;
+
+}
+
+data.appeals.forEach(a=>{
+
+list.innerHTML+=`
+
+<div class="profile-card">
+
+<h2>
+
+${a.productTitle}
+
+</h2>
+
+<p>
+
+👤 ${a.sellerName}
+
+</p>
+
+<p>
+
+🚫 ${a.adminReason}
+
+</p>
+
+<p>
+
+📝 ${a.reason}
+
+</p>
+
+<p>
+
+📌 ${a.status}
+
+</p>
+
+<div class="user-actions">
+
+<button
+class="btn-admin"
+onclick="approveAppeal(${a.id})"
+>
+
+✅ Terima
+
+</button>
+
+<button
+class="btn-delete"
+onclick="rejectAppeal(${a.id})"
+>
+
+❌ Tolak
+
+</button>
+
+</div>
+
+</div>
+
+`;
+
+});
+
+}
+
+async function approveAppeal(id){
+
+if(
+!confirm(
+"Terima banding ini?"
+)
+)return;
+
+const res=
+await fetch(
+API_URL + "/api/admin/appeals/approve/"+id,
+{
+method:"PUT",
+credentials:"include"
+}
+);
+
+const data=
+await res.json();
+
+alert(data.message);
+
+if(data.success){
+
+loadAppeals();
+
+}
+
+}
+
+async function rejectAppeal(id){
+
+if(
+!confirm(
+"Tolak banding ini?"
+)
+)return;
+
+const res=
+await fetch(
+API_URL + "/api/admin/appeals/reject/"+id,
+{
+method:"PUT",
+credentials:"include"
+}
+);
+
+const data=
+await res.json();
+
+alert(data.message);
+
+if(data.success){
+
+loadAppeals();
+
+}
+
+}
+
+loadAppeals();
+
+</script>
+
+</body>
+</html>

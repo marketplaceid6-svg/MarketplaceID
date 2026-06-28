@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Detail Produk</title>
+
+<link rel="stylesheet" href="/public/css/style.css">
+
+<style>
+
+.product-image{
+width:100%;
+height:300px;
+object-fit:cover;
+background:#111;
+}
+
+.slider{
+position:relative;
+overflow:hidden;
+}
+
+.slider-track{
+display:flex;
+overflow-x:auto;
+scroll-snap-type:x mandatory;
+scroll-behavior:smooth;
+}
+
+.slider-track::-webkit-scrollbar{
+display:none;
+}
+
+.slider-track img{
+width:100%;
+height:300px;
+object-fit:cover;
+flex-shrink:0;
+scroll-snap-align:start;
+}
+
+.slider-dots{
+position:absolute;
+bottom:12px;
+left:50%;
+transform:translateX(-50%);
+display:flex;
+gap:6px;
+}
+
+.slider-dots span{
+width:8px;
+height:8px;
+border-radius:50%;
+background:rgba(255,255,255,.5);
+}
+
+.slider-dots .active{
+background:#ff3b3b;
+}
+
+.product-card{
+background:#0f1625;
+margin:15px;
+padding:15px;
+border-radius:20px;
+border:1px solid #1f2937;
+}
+
+.product-title{
+font-size:22px;
+font-weight:700;
+margin-bottom:8px;
+}
+
+.product-price{
+font-size:24px;
+font-weight:700;
+color:#ff3b3b;
+}
+
+.product-meta{
+margin-top:10px;
+font-size:13px;
+color:#9ca3af;
+}
+
+.product-desc{
+margin-top:15px;
+line-height:1.6;
+font-size:14px;
+}
+
+.action-bar{
+position:fixed;
+left:0;
+right:0;
+bottom:0;
+height:75px;
+
+background:#0b0f19;
+
+display:flex;
+gap:10px;
+
+padding:10px 15px;
+
+border-top:1px solid #1f2937;
+}
+
+.btn{
+flex:1;
+
+border:none;
+
+border-radius:15px;
+
+font-weight:700;
+}
+
+.btn-chat{
+background:#111827;
+color:white;
+}
+
+.btn-buy{
+background:#ff3b3b;
+color:white;
+}
+
+.loading{
+padding:100px 20px;
+text-align:center;
+color:#888;
+}
+
+.seller-card{
+display:flex;
+align-items:center;
+gap:15px;
+background:#08152f;
+border:1px solid rgba(255,255,255,.08);
+padding:15px;
+border-radius:18px;
+margin-top:20px;
+cursor:pointer;
+transition:.25s;
+}
+
+.seller-card:hover{
+transform:scale(1.02);
+border-color:#ff3b3b;
+}
+
+.seller-avatar{
+width:60px;
+height:60px;
+border-radius:50%;
+object-fit:cover;
+}
+
+.seller-name{
+font-size:18px;
+font-weight:bold;
+color:white;
+}
+
+.seller-info{
+color:#aaa;
+font-size:14px;
+}
+
+.related-grid{
+display:grid;
+grid-template-columns:1fr;
+gap:12px;
+margin-top:15px;
+}
+
+.related-card{
+background:#08152f;
+border-radius:15px;
+overflow:hidden;
+border:1px solid rgba(255,255,255,.08);
+}
+
+.related-card img{
+width:100%;
+height:160px;
+object-fit:cover;
+}
+
+.related-body{
+padding:10px;
+}
+
+.related-title{
+font-size:14px;
+font-weight:bold;
+color:white;
+margin-bottom:6px;
+}
+
+.related-price{
+color:#ff3b3b;
+font-weight:bold;
+font-size:16px;
+}
+
+body{
+padding-bottom:120px;
+}
+
+.image-viewer{
+position:fixed;
+left:0;
+top:0;
+width:100%;
+height:100%;
+background:#000;
+z-index:9999;
+display:none;
+flex-direction:column;
+}
+
+.viewer-track{
+display:flex;
+overflow-x:auto;
+scroll-snap-type:x mandatory;
+height:100%;
+scroll-behavior:smooth;
+}
+
+.viewer-track::-webkit-scrollbar{
+display:none;
+}
+
+.viewer-track img{
+width:100%;
+height:100%;
+object-fit:contain;
+flex-shrink:0;
+scroll-snap-align:start;
+transition:transform .25s ease;
+transform-origin:center center;
+cursor:zoom-in;
+}
+
+.viewer-close{
+position:absolute;
+top:20px;
+right:20px;
+z-index:10000;
+background:rgba(255,255,255,.15);
+color:white;
+border:none;
+width:45px;
+height:45px;
+border-radius:50%;
+font-size:22px;
+}
+
+.viewer-dots{
+position:absolute;
+bottom:25px;
+left:50%;
+transform:translateX(-50%);
+display:flex;
+gap:8px;
+}
+
+.viewer-dots span{
+width:9px;
+height:9px;
+border-radius:50%;
+background:#777;
+}
+
+.viewer-dots .active{
+background:white;
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="content">
+
+<div class="loading">
+Memuat produk...
+</div>
+
+</div>
+
+<div class="action-bar">
+
+<button
+class="btn btn-chat"
+onclick="chatSeller()"
+>
+Chat
+</button>
+
+<button
+class="btn-submit"
+onclick="offerPrice()"
+>
+💰 Tawar Harga
+</button>
+
+</div>
+
+<script src="/public/js/config.js"></script>
+
+<script>
+
+const params =
+new URLSearchParams(
+window.location.search
+);
+
+const id =
+params.get("id");
+
+let currentProduct = null;
+
+async function loadProduct(){
+
+try{
+
+const res =
+await fetch(
+API_URL + "/api/products/" + id
+);
+
+const data =
+await res.json();
+
+if(!data.product){
+
+document.getElementById(
+"content"
+).innerHTML =
+"<div class='loading'>Produk tidak ditemukan</div>";
+
+return;
+
+}
+
+const p =
+data.product;
+
+currentProduct = p;
+
+loadSeller();
+
+document.getElementById(
+"content"
+).innerHTML =
+`
+<div
+class="slider"
+onclick="openViewer()"
+>
+
+<div
+class="slider-track"
+id="sliderTrack"
+>
+
+${
+(
+p.images &&
+p.images.length
+?
+p.images
+:
+["/public/images/banner1.jpg"]
+)
+.map(img=>`
+
+<img
+class="product-image"
+src="${img}"
+>
+
+`).join("")
+}
+
+</div>
+
+<div
+class="slider-dots"
+id="sliderDots"
+></div>
+
+</div>
+
+<div class="product-card">
+
+<div class="product-title">
+${p.title}
+</div>
+
+${p.oldPrice ?
+`
+<div style="
+display:inline-block;
+background:#ff3b3b;
+padding:4px 8px;
+border-radius:8px;
+font-size:12px;
+font-weight:bold;
+margin-bottom:8px;
+">
+-${Math.round(
+(
+(p.oldPrice-p.price)
+/p.oldPrice
+)*100
+)}%
+</div>
+`
+:
+""
+}
+
+${p.oldPrice ?
+`
+<div style="
+text-decoration:line-through;
+color:#888;
+margin-bottom:5px;
+">
+Rp ${Number(
+p.oldPrice
+).toLocaleString("id-ID")}
+</div>
+`
+:
+""
+}
+
+<div class="product-price">
+Rp ${Number(
+p.price
+).toLocaleString("id-ID")}
+</div>
+
+<div class="product-meta">
+📍 ${p.location || "Indonesia"}
+</div>
+
+<div class="product-meta">
+👁 ${p.views || 0} views
+</div>
+
+<div class="product-meta">
+📦 ${p.category || "-"}
+</div>
+
+<div class="product-desc">
+${p.description || "Tidak ada deskripsi"}
+</div>
+
+<div
+id="sellerCard"
+class="seller-card"
+onclick="openSellerProfile()"
+style="cursor:pointer"
+>
+Memuat data penjual...
+</div>
+
+<div class="related-title">
+🔥 Produk Serupa
+</div>
+
+<div
+id="relatedProducts"
+class="related-grid"
+>
+Memuat...
+</div>
+
+</div>
+
+</div>
+
+</div>
+`;
+
+const track =
+document.getElementById(
+"sliderTrack"
+);
+
+const dots =
+document.getElementById(
+"sliderDots"
+);
+
+if(track && dots){
+
+const total =
+track.children.length;
+
+for(let i=0;i<total;i++){
+
+const dot =
+document.createElement("span");
+
+if(i===0){
+
+dot.classList.add("active");
+
+}
+
+dots.appendChild(dot);
+
+}
+
+track.addEventListener(
+"scroll",
+()=>{
+
+const index =
+Math.round(
+track.scrollLeft /
+track.clientWidth
+);
+
+[...dots.children].forEach(
+(d,i)=>{
+
+d.classList.toggle(
+"active",
+i===index
+);
+
+});
+
+});
+
+}
+
+}catch(err){
+
+console.log(err);
+
+}
+
+}
+
+function chatSeller(){
+
+if(
+!currentProduct
+){
+return;
+}
+
+location.href =
+"/chat?userId=" +
+currentProduct.sellerId +
+"&productId=" +
+currentProduct.id;
+
+}
+
+loadProduct();
+
+setTimeout(()=>{
+loadRelatedProducts();
+},1000);
+
+async function loadRelatedProducts(){
+
+try{
+
+const res =
+await fetch(
+API_URL + "/api/related/" + id
+);
+
+const data =
+await res.json();
+
+const container =
+document.getElementById(
+"relatedProducts"
+);
+
+if(
+!data.products ||
+data.products.length === 0
+){
+
+container.innerHTML =
+`
+<div class="empty">
+Tidak ada produk serupa
+</div>
+`;
+
+return;
+
+}
+
+container.innerHTML = "";
+
+data.products.forEach(
+product=>{
+
+const image =
+product.images &&
+product.images.length
+?
+product.images[0]
+:
+"/public/images/banner1.jpg";
+
+container.innerHTML += `
+<div
+class="related-card"
+onclick="
+location.href='/product?id=${product.id}'
+"
+>
+
+<img src="${image}">
+
+<div class="related-body">
+
+<div class="related-title">
+${product.title}
+</div>
+
+<div class="related-price">
+Rp ${Number(product.price).toLocaleString("id-ID")}
+</div>
+
+</div>
+
+</div>
+`;
+
+});
+
+}catch(err){
+
+console.log(err);
+
+}
+
+}
+
+async function loadSeller(){
+
+if(!currentProduct)
+return;
+
+try{
+
+const res =
+await fetch(
+API_URL + "/api/seller/" +
+currentProduct.sellerId
+);
+
+const data =
+await res.json();
+
+if(!data.success)
+return;
+
+const seller =
+data.seller;
+
+document.getElementById(
+"sellerCard"
+).innerHTML = `
+<img
+class="seller-avatar"
+src="${seller.avatar}"
+>
+
+<div>
+
+<div class="seller-name">
+${seller.username}
+</div>
+
+<div class="seller-info">
+📍 ${seller.city || "Indonesia"}
+</div>
+
+<div class="seller-info">
+⭐ ${seller.followers || 0} Followers
+</div>
+
+<div class="seller-info">
+${seller.verified ? "✅ Terverifikasi" : "🟡 Belum Verifikasi"}
+</div>
+
+</div>
+`;
+
+}catch(err){
+
+console.log(err);
+
+}
+
+}
+
+function openSellerProfile(){
+
+if(!currentProduct){
+return;
+}
+
+location.href =
+"/seller?id=" +
+currentProduct.sellerId;
+
+}
+
+async function offerPrice(){
+
+const price =
+prompt(
+"Masukkan harga tawaran"
+);
+
+if(!price)
+return;
+
+const res =
+await fetch(
+API_URL + "/api/offer/send",
+{
+method:"POST",
+credentials:"include",
+headers:{
+"Content-Type":
+"application/json"
+},
+body:JSON.stringify({
+productId:
+currentProduct.id,
+sellerId:
+currentProduct.sellerId,
+price
+})
+}
+);
+
+const data =
+await res.json();
+
+if(data.success){
+
+await fetch(
+API_URL + "/api/chat/send",
+{
+method:"POST",
+credentials:"include",
+headers:{
+"Content-Type":
+"application/json"
+},
+body:JSON.stringify({
+toUserId:
+currentProduct.sellerId,
+productId:
+currentProduct.id,
+message:
+"[OFFER]" +
+data.offer.id
+})
+}
+);
+
+alert(
+"Penawaran terkirim"
+);
+
+}
+
+}
+
+function openViewer(){
+
+const viewer =
+document.getElementById(
+"imageViewer"
+);
+
+const track =
+document.getElementById(
+"viewerTrack"
+);
+
+const dots =
+document.getElementById(
+"viewerDots"
+);
+
+viewer.style.display="flex";
+
+track.innerHTML="";
+dots.innerHTML="";
+
+const images =
+currentProduct.images &&
+currentProduct.images.length
+?
+currentProduct.images
+:
+["/public/images/banner1.jpg"];
+
+images.forEach((img,index)=>{
+
+track.innerHTML +=
+`
+<img src="${img}">
+`;
+
+setTimeout(()=>{
+
+const images =
+track.querySelectorAll("img");
+
+images.forEach(image=>{
+
+let zoom=false;
+
+image.addEventListener(
+"dblclick",
+()=>{
+
+zoom=!zoom;
+
+image.style.transform =
+zoom
+?
+"scale(2)"
+:
+"scale(1)";
+
+});
+
+});
+
+},100);
+
+dots.innerHTML +=
+`
+<span
+class="${
+index===0
+?
+'active'
+:
+''
+}">
+</span>
+`;
+
+});
+
+track.addEventListener(
+"scroll",
+()=>{
+
+const current =
+Math.round(
+track.scrollLeft /
+track.clientWidth
+);
+
+[...dots.children].forEach(
+(dot,i)=>{
+
+dot.classList.toggle(
+"active",
+i===current
+);
+
+});
+
+});
+
+}
+
+function closeViewer(){
+
+document.getElementById(
+"imageViewer"
+).style.display="none";
+
+}
+
+</script>
+
+<div id="imageViewer" class="image-viewer">
+
+<button
+class="viewer-close"
+onclick="closeViewer()"
+>
+✕
+</button>
+
+<div
+id="viewerTrack"
+class="viewer-track"
+>
+</div>
+
+<div
+id="viewerDots"
+class="viewer-dots"
+>
+</div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,4346 @@
+require("dotenv").config();
+
+const express = require("express");
+const session = require("express-session");
+const cors = require("cors");
+const fs = require("fs-extra");
+const path = require("path");
+const bcrypt = require("bcryptjs");
+const multer = require("multer");
+
+const app = express();
+
+const PORT = process.env.PORT || 3000;
+
+const typingUsers = {};
+
+/* =========================
+   MIDDLEWARE
+========================= */
+
+app.use(cors());
+
+app.use(express.json({
+  limit: "20mb"
+}));
+
+app.use(express.urlencoded({
+  extended: true
+}));
+
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false
+  })
+);
+
+app.use(async(req,res,next)=>{
+
+if(req.session?.userId){
+
+try{
+
+const db =
+await readDB(
+"users.json"
+);
+
+const users =
+db.users || [];
+
+const user =
+users.find(
+u =>
+u.id ===
+req.session.userId
+);
+
+if(user){
+
+user.lastActive =
+Date.now();
+
+await writeDB(
+"users.json",
+{
+users
+}
+);
+
+}
+
+}catch(err){
+
+console.log(err);
+
+}
+
+}
+
+next();
+
+});
+
+/* =========================
+   STATIC
+========================= */
+
+app.use(
+  "/public",
+  express.static(
+    path.join(__dirname, "public")
+  )
+);
+
+app.use(
+  "/uploads",
+  express.static(
+    path.join(__dirname, "uploads")
+  )
+);
+
+/* =========================
+   DATABASE FILES
+========================= */
+
+const DATABASES = {
+  users: {
+    file: "users.json",
+    default: { users: [] }
+  },
+
+  products: {
+    file: "products.json",
+    default: { products: [] }
+  },
+
+  chats: {
+    file: "chats.json",
+    default: { chats: [] }
+  },
+
+  orders: {
+    file: "orders.json",
+    default: { orders: [] }
+  },
+
+  favorites: {
+    file: "favorites.json",
+    default: { favorites: [] }
+  },
+
+  notifications: {
+    file: "notifications.json",
+    default: { notifications: [] }
+  },
+
+appeals: {
+  file: "appeals.json",
+  default: { appeals: [] }
+},
+
+  reports: {
+    file: "reports.json",
+    default: { reports: [] }
+  },
+
+  reviews: {
+    file: "reviews.json",
+    default: { reviews: [] }
+  },
+
+  verifications: {
+    file: "verifications.json",
+    default: { verifications: [] }
+  },
+
+  follows: {
+    file: "follows.json",
+    default: { follows: [] }
+  },
+
+  locations: {
+    file: "locations.json",
+    default: { locations: [] }
+  }
+};
+
+/* =========================
+   MULTER PRODUCT UPLOAD
+========================= */
+
+const productStorage =
+  multer.diskStorage({
+
+    destination:
+      function (
+        req,
+        file,
+        cb
+      ) {
+
+        cb(
+          null,
+          path.join(
+            __dirname,
+            "uploads/products"
+          )
+        );
+
+      },
+
+    filename:
+      function (
+        req,
+        file,
+        cb
+      ) {
+
+        const ext =
+          path.extname(
+            file.originalname
+          );
+
+        cb(
+          null,
+          Date.now() +
+            "-" +
+            Math.floor(
+              Math.random() * 99999
+            ) +
+            ext
+        );
+
+      }
+  });
+
+/* =========================
+   MULTER UPLOAD CHAT
+========================= */
+
+const uploadProduct =
+  multer({
+    storage:
+      productStorage
+  });
+
+const chatStorage =
+multer.diskStorage({
+
+destination:
+(req,file,cb)=>{
+
+cb(
+null,
+"uploads/chat"
+);
+
+},
+
+filename:
+(req,file,cb)=>{
+
+cb(
+null,
+Date.now() +
+"-" +
+file.originalname
+);
+
+}
+
+});
+
+const uploadChat =
+multer({
+storage:chatStorage
+});
+
+/* =========================
+   PROFILE UPLOAD
+========================= */
+
+const profileStorage =
+  multer.diskStorage({
+
+    destination:
+      function (
+        req,
+        file,
+        cb
+      ) {
+
+        cb(
+          null,
+          path.join(
+            __dirname,
+            "uploads/profiles"
+          )
+        );
+
+      },
+
+    filename:
+      function (
+        req,
+        file,
+        cb
+      ) {
+
+        const ext =
+          path.extname(
+            file.originalname
+          );
+
+        cb(
+          null,
+          Date.now() +
+            "-" +
+            Math.floor(
+              Math.random() * 99999
+            ) +
+            ext
+        );
+
+      }
+  });
+
+const uploadProfile =
+  multer({
+    storage:
+      profileStorage
+  });
+
+/* =========================
+   DATABASE INIT
+========================= */
+
+async function initializeDatabase() {
+
+  const databaseDir =
+    path.join(
+      __dirname,
+      "database"
+    );
+
+  await fs.ensureDir(databaseDir);
+
+  for (const key in DATABASES) {
+
+    const db = DATABASES[key];
+
+    const filePath =
+      path.join(
+        databaseDir,
+        db.file
+      );
+
+    await fs.ensureFile(filePath);
+
+    const content =
+      await fs.readFile(
+        filePath,
+        "utf8"
+      );
+
+    if (!content.trim()) {
+
+      await fs.writeJson(
+        filePath,
+        db.default,
+        {
+          spaces: 2
+        }
+      );
+
+      console.log(
+        `Created ${db.file}`
+      );
+    }
+  }
+
+  console.log(
+    "Database Initialized"
+  );
+}
+
+/* =========================
+   HELPERS
+========================= */
+
+async function readDB(fileName) {
+
+  const filePath =
+    path.join(
+      __dirname,
+      "database",
+      fileName
+    );
+
+  try {
+
+    return await fs.readJson(
+      filePath
+    );
+
+  } catch {
+
+    return {};
+  }
+}
+
+async function writeDB(
+  fileName,
+  data
+) {
+
+  const filePath =
+    path.join(
+      __dirname,
+      "database",
+      fileName
+    );
+
+  await fs.writeJson(
+    filePath,
+    data,
+    {
+      spaces: 2
+    }
+  );
+}
+
+function generateId() {
+
+  return (
+    Date.now() +
+    Math.floor(
+      Math.random() * 1000
+    )
+  );
+}
+
+async function addNotification(
+userId,
+type,
+fromUserId,
+title
+){
+
+console.log("NOTIF DIPANGGIL");
+console.log(userId);
+console.log(title);
+
+const db=
+await readDB(
+"notifications.json"
+);
+
+db.notifications=
+db.notifications||[];
+
+db.notifications.unshift({
+
+id:Date.now(),
+
+userId,
+
+type,
+
+fromUserId,
+
+title,
+
+read:false,
+
+createdAt:Date.now()
+
+});
+
+await writeDB(
+"notifications.json",
+db
+);
+
+}
+
+/* =========================
+   AUTH MIDDLEWARE
+========================= */
+
+function requireLogin(
+  req,
+  res,
+  next
+) {
+
+  if (
+    !req.session.userId
+  ) {
+
+    return res.status(401).json({
+      success: false,
+      message:
+        "Login diperlukan"
+    });
+
+  }
+
+  next();
+}
+
+async function requireAdmin(
+req,
+res,
+next
+){
+
+const db=
+await readDB(
+"users.json"
+);
+
+const user=
+(db.users||[]).find(
+u=>
+String(u.id)===
+String(req.session.userId)
+);
+
+if(!user){
+
+return res.status(401).json({
+success:false,
+message:"Login diperlukan"
+});
+
+}
+
+if(
+user.role!=="admin"
+&&
+user.role!=="owner"
+){
+
+return res.status(403).json({
+success:false,
+message:"Akses ditolak"
+});
+
+}
+
+req.user=user;
+
+next();
+
+}
+
+/* =========================
+   REGISTER
+========================= */
+
+app.post(
+  "/api/register",
+  async (req, res) => {
+
+    try {
+
+      const {
+        username,
+        email,
+        password
+      } = req.body;
+
+      if (
+        !username ||
+        !email ||
+        !password
+      ) {
+
+        return res.json({
+          success: false,
+          message:
+            "Semua field wajib diisi"
+        });
+
+      }
+
+      const db =
+        await readDB(
+          "users.json"
+        );
+
+      const users =
+        db.users || [];
+
+      const exists =
+        users.find(
+          u =>
+            u.email ===
+              email ||
+            u.username ===
+              username
+        );
+
+      if (exists) {
+
+        return res.json({
+          success: false,
+          message:
+            "User sudah ada"
+        });
+
+      }
+
+      const hashed =
+        await bcrypt.hash(
+          password,
+          10
+        );
+
+      const user = {
+        id: generateId(),
+        username,
+        email,
+        password: hashed,
+
+        role: "user",
+        blocked:false,
+    avatar:
+          "/uploads/profiles/default-avatar.png",
+
+        bio: "",
+        city: "",
+        verified: false,
+        rating: 0,
+        reviewCount: 0,
+        followers: 0,
+        following: 0,
+        joinedAt:
+          Date.now(),
+        lastActive:
+          Date.now()
+      };
+
+      users.push(user);
+
+      await writeDB(
+        "users.json",
+        { users }
+      );
+
+      res.json({
+        success: true,
+        message:
+          "Register berhasil"
+      });
+
+    } catch (err) {
+
+      console.log(err);
+
+      res.status(500).json({
+        success: false
+      });
+
+    }
+  }
+);
+
+/* =========================
+   LOGIN
+========================= */
+
+app.post(
+  "/api/login",
+  async (req, res) => {
+
+    try {
+
+      const {
+        login,
+        password
+      } = req.body;
+
+      const db =
+        await readDB(
+          "users.json"
+        );
+
+      const users =
+        db.users || [];
+
+      const user =
+        users.find(
+          u =>
+            u.username ===
+              login ||
+            u.email ===
+              login
+        );
+
+      if (!user) {
+
+        return res.json({
+          success: false,
+          message:
+            "Akun tidak ditemukan"
+        });
+
+      }
+
+if(user.blocked){
+
+  return res.json({
+    success:false,
+    message:"Akun Anda telah diblokir Admin"
+  });
+
+}
+
+      const match =
+        await bcrypt.compare(
+          password,
+          user.password
+        );
+
+      if (!match) {
+
+        return res.json({
+          success: false,
+          message:
+            "Password salah"
+        });
+
+      }
+
+      req.session.userId =
+        user.id;
+
+      /* UPDATE LAST ACTIVE */
+user.lastActive =
+  Date.now();
+
+await writeDB(
+  "users.json",
+  { users }
+);
+
+      res.json({
+        success: true,
+        user: {
+          id: user.id,
+          username:
+            user.username,
+          email:
+            user.email
+        }
+      });
+
+    } catch {
+
+      res.status(500).json({
+        success: false
+      });
+
+    }
+  }
+);
+
+/* =========================
+   ME
+========================= */
+
+app.get(
+  "/api/me",
+  requireLogin,
+  async (req, res) => {
+
+    const db =
+      await readDB(
+        "users.json"
+      );
+
+const user =
+  (
+    db.users || []
+  ).find(
+    u =>
+      u.id ===
+      req.session.userId
+  );
+
+if (!user) {
+
+  return res.status(404).json({
+    success: false,
+    message:
+      "User tidak ditemukan"
+  });
+
+}
+
+res.json({
+  success: true,
+  user
+});
+}
+);
+
+/* =========================
+   LOGOUT
+========================= */
+
+app.post(
+  "/api/logout",
+  (
+    req,
+    res
+  ) => {
+
+    req.session.destroy(
+      () => {
+
+        res.json({
+          success: true
+        });
+
+      }
+    );
+
+  }
+);
+
+/* =========================
+   HOME FEED
+========================= */
+
+app.get(
+  "/api/home",
+  async (req, res) => {
+
+    try {
+
+      const db =
+        await readDB(
+          "products.json"
+        );
+
+      const products =
+        db.products || [];
+
+      const active =
+products.filter(
+p =>
+p.status ===
+"active"
+);
+
+const latest =
+[...active]
+.sort(
+(a,b)=>
+b.createdAt -
+a.createdAt
+)
+.slice(0,20);
+
+const recommend =
+[...active]
+.sort(
+()=>Math.random()-0.5
+)
+.slice(0,20);
+
+res.json({
+success:true,
+latest,
+recommend
+});
+
+    } catch {
+
+      res.status(500).json({
+        success: false
+      });
+
+    }
+  }
+);
+
+/* =========================
+   PRODUCT DETAIL
+========================= */
+
+app.get(
+  "/api/products/:id",
+  async (req, res) => {
+
+    try {
+
+      const id =
+        Number(
+          req.params.id
+        );
+
+      const db =
+        await readDB(
+          "products.json"
+        );
+
+      const product =
+        (
+          db.products || []
+        ).find(
+          p =>
+            p.id === id
+        );
+
+      if (!product) {
+
+        return res.status(404).json({
+          success: false,
+          message:
+            "Produk tidak ditemukan"
+        });
+
+      }
+
+/* VIEW COUNTER */
+product.views =
+  (product.views || 0) + 1;
+
+await writeDB(
+  "products.json",
+  {
+    products:
+      db.products
+  }
+);
+
+      res.json({
+        success: true,
+        product
+      });
+
+    } catch {
+
+      res.status(500).json({
+        success: false
+      });
+
+    }
+  }
+);
+
+/* =========================
+   PRODUCT DETAIL SOLD
+========================= */
+
+app.put(
+"/api/products/:id/sold",
+requireLogin,
+async(req,res)=>{
+
+try{
+
+const db =
+await readDB(
+"products.json"
+);
+
+const products =
+db.products || [];
+
+const product =
+products.find(
+p=>
+String(p.id)===
+String(req.params.id)
+);
+
+if(!product){
+
+return res.json({
+success:false,
+message:"Produk tidak ditemukan"
+});
+
+}
+
+if(
+String(product.sellerId)!==
+String(req.session.userId)
+){
+
+return res.json({
+success:false,
+message:"Bukan produk milik Anda"
+});
+
+}
+
+product.status="sold";
+
+await writeDB(
+"products.json",
+db
+);
+
+res.json({
+success:true
+});
+
+}catch(err){
+
+console.log(err);
+
+res.json({
+success:false
+});
+
+}
+
+}
+);
+
+/* =========================
+   PENAWARAN
+========================= */
+
+app.post(
+"/api/offer/send",
+requireLogin,
+async(req,res)=>{
+
+const {
+productId,
+sellerId,
+price
+} = req.body;
+
+const db =
+await readDB(
+"offers.json"
+);
+
+const offers =
+db.offers || [];
+
+const offer = {
+id:generateId(),
+productId:Number(productId),
+buyerId:req.session.userId,
+sellerId:Number(sellerId),
+price:Number(price),
+status:"pending",
+createdAt:Date.now()
+};
+
+offers.push(offer);
+
+await writeDB(
+"offers.json",
+{
+offers
+}
+);
+
+res.json({
+success:true,
+offer
+});
+
+}
+);
+
+/* =========================
+   HARGA PENAWARAN
+========================= */
+
+app.get(
+"/api/offer/:id",
+requireLogin,
+async(req,res)=>{
+
+const db =
+await readDB(
+"offers.json"
+);
+
+const offer =
+(db.offers||[])
+.find(
+o =>
+String(o.id) ===
+String(req.params.id)
+);
+
+res.json({
+success:true,
+offer,
+myUserId:
+req.session.userId
+});
+
+}
+);
+
+/* =========================
+   UPDATE STATUS OFFER
+========================= */
+
+app.post(
+"/api/offer/status",
+requireLogin,
+async(req,res)=>{
+
+const {
+offerId,
+status
+} = req.body;
+
+const db =
+await readDB(
+"offers.json"
+);
+
+const offers =
+db.offers || [];
+
+const offer =
+offers.find(
+o =>
+String(o.id) ===
+String(offerId)
+);
+
+if(!offer){
+
+return res.json({
+success:false
+});
+
+}
+
+offer.status =
+status;
+
+await writeDB(
+"offers.json",
+{
+offers
+}
+);
+
+res.json({
+success:true
+});
+
+}
+);
+
+/* =========================
+   DELECT CHATS
+========================= */
+
+app.delete(
+"/api/chat/delete/:id",
+requireLogin,
+async(req,res)=>{
+
+const db =
+await readDB(
+"chats.json"
+);
+
+let chats =
+db.chats || [];
+
+chats =
+chats.filter(
+c =>
+!(
+String(c.id) ===
+String(req.params.id)
+&&
+c.fromUserId ===
+req.session.userId
+)
+);
+
+await writeDB(
+"chats.json",
+{
+chats
+}
+);
+
+res.json({
+success:true
+});
+
+}
+);
+
+/* =========================
+   ADD PRODUCT
+========================= */
+
+app.post(
+  "/api/products",
+  requireLogin,
+  uploadProduct.array(
+    "images",
+    10
+  ),
+  async (req, res) => {
+
+    try {
+
+      const {
+        title,
+        price,
+        category,
+        description,
+        location
+      } = req.body;
+
+      const db =
+        await readDB(
+          "products.json"
+        );
+
+      const products =
+        db.products || [];
+
+      const images =
+        (req.files || [])
+          .map(
+            file =>
+              "/uploads/products/" +
+              file.filename
+          );
+
+      const product = {
+        id: generateId(),
+        sellerId:
+          req.session.userId,
+        title,
+        price:
+          Number(price),
+        category,
+        description:
+          description || "",
+        location:
+          location || "",
+        latitude: 0,
+        longitude: 0,
+        images,
+        views: 0,
+        favorites: 0,
+        status: "active",
+        createdAt:
+          Date.now()
+      };
+
+      products.push(
+        product
+      );
+
+      await writeDB(
+        "products.json",
+        { products }
+      );
+
+      res.json({
+        success: true,
+        product
+      });
+
+    } catch (err) {
+
+      console.log(err);
+
+      res.status(500).json({
+        success: false
+      });
+
+    }
+  }
+);
+
+/* =========================
+   DELETE PRODUCT
+========================= */
+
+app.delete(
+"/api/products/:id",
+requireLogin,
+async(req,res)=>{
+
+try{
+
+const db =
+await readDB(
+"products.json"
+);
+
+let products =
+db.products || [];
+
+const product =
+products.find(
+p =>
+String(p.id) ===
+String(req.params.id)
+);
+
+if(!product){
+
+return res.json({
+success:false,
+message:"Produk tidak ditemukan"
+});
+
+}
+
+if(
+String(product.sellerId)
+!== String(req.session.userId)
+){
+
+return res.json({
+success:false,
+message:"Bukan produk milik anda"
+});
+
+}
+
+products =
+products.filter(
+p =>
+String(p.id)
+!== String(req.params.id)
+);
+
+await writeDB(
+"products.json",
+{
+products
+}
+);
+
+res.json({
+success:true
+});
+
+}catch(err){
+
+console.log(err);
+
+res.status(500).json({
+success:false
+});
+
+}
+
+}
+);
+
+/* =========================
+   JUMLAH UNREAD PESAN
+========================= */
+
+app.get(
+"/api/unread-count",
+requireLogin,
+async(req,res)=>{
+
+const db =
+await readDB(
+"chats.json"
+);
+
+const chats =
+db.chats || [];
+
+const total =
+chats.filter(
+c =>
+c.toUserId ===
+req.session.userId
+&&
+!c.read
+).length;
+
+res.json({
+success:true,
+count:total
+});
+
+}
+);
+
+/* =========================
+   RECOMMEND PRODUCTS
+========================= */
+
+function shuffleArray(array){
+
+for(
+let i = array.length - 1;
+i > 0;
+i--
+){
+
+const j =
+Math.floor(
+Math.random() * (i + 1)
+);
+
+[array[i], array[j]] =
+[array[j], array[i]];
+
+}
+
+return array;
+
+}
+
+app.get(
+"/api/recommend-products",
+async(req,res)=>{
+
+try{
+
+const db =
+await readDB(
+"products.json"
+);
+
+const products =
+db.products || [];
+
+const active =
+products.filter(
+p =>
+p.status === "active"
+);
+
+const shuffled =
+shuffleArray(
+[...active]
+);
+
+res.json({
+success:true,
+products:
+shuffled.slice(0,20)
+});
+
+}catch(err){
+
+console.log(err);
+
+res.json({
+success:false
+});
+
+}
+
+}
+);
+
+/* =========================
+   RELATED PRODUCTS
+========================= */
+
+app.get(
+"/api/related/:id",
+async(req,res)=>{
+
+try{
+
+const db =
+await readDB(
+"products.json"
+);
+
+const products =
+db.products || [];
+
+const current =
+products.find(
+p =>
+String(p.id) ===
+String(req.params.id)
+);
+
+if(!current){
+
+return res.json({
+success:false
+});
+
+}
+
+const related =
+products.filter(
+p =>
+p.category ===
+current.category &&
+p.id !== current.id &&
+p.status === "active"
+)
+.slice(0,6);
+
+res.json({
+success:true,
+products:related
+});
+
+}catch(err){
+
+console.log(err);
+
+res.json({
+success:false
+});
+
+}
+
+}
+);
+
+/* =========================
+   SEARCH PRODUCT
+========================= */
+
+app.get(
+  "/api/search",
+  async (req, res) => {
+
+    try {
+
+      const keyword =
+        (
+          req.query.q || ""
+        ).toLowerCase();
+
+      const db =
+        await readDB(
+          "products.json"
+        );
+
+      const products =
+        db.products || [];
+
+      const result =
+products.filter(
+p =>
+p.status === "active" &&
+(
+(p.title || "")
+.toLowerCase()
+.includes(keyword)
+
+||
+
+(p.category || "")
+.toLowerCase()
+.includes(keyword)
+
+||
+
+(p.location || "")
+.toLowerCase()
+.includes(keyword)
+)
+);
+
+      res.json({
+        success: true,
+        products: result
+      });
+
+    } catch {
+
+      res.status(500).json({
+        success: false
+      });
+
+    }
+  }
+);
+
+/* =========================
+   CATEGORY PRODUCTS
+========================= */
+
+app.get(
+  "/api/category/:name",
+  async (req, res) => {
+
+    try {
+
+      const category =
+        req.params.name
+          .toLowerCase();
+
+      const db =
+        await readDB(
+          "products.json"
+        );
+
+      const products =
+        db.products || [];
+
+      const result =
+        products.filter(
+          p =>
+            p.status ===
+              "active" &&
+            p.category
+              .toLowerCase() ===
+              category
+        );
+
+      res.json({
+        success: true,
+        products: result
+      });
+
+    } catch {
+
+      res.status(500).json({
+        success: false
+      });
+
+    }
+  }
+);
+
+/* =========================
+   MY ADS
+========================= */
+
+app.get(
+  "/api/my-ads",
+  requireLogin,
+  async (req, res) => {
+
+    try {
+
+      const db =
+        await readDB(
+          "products.json"
+        );
+
+      const products =
+        db.products || [];
+
+      const myAds =
+        products.filter(
+          p =>
+            p.sellerId ===
+            req.session.userId
+        );
+
+      res.json({
+        success: true,
+        products: myAds
+      });
+
+    } catch {
+
+      res.status(500).json({
+        success: false
+      });
+
+    }
+  }
+);
+
+/* =========================
+   EDIT PRODUCT
+========================= */
+
+app.get(
+"/api/edit-product/:id",
+requireLogin,
+async(req,res)=>{
+
+const db =
+await readDB(
+"products.json"
+);
+
+const product =
+(db.products || [])
+.find(
+p =>
+String(p.id) ===
+String(req.params.id)
+);
+
+res.json({
+success:true,
+product
+});
+
+}
+);
+
+/* =========================
+   UPDATE EDIT-PRODUCT
+========================= */
+
+app.put(
+"/api/edit-product/:id",
+requireLogin,
+async(req,res)=>{
+
+try{
+
+const db =
+await readDB(
+"products.json"
+);
+
+const products =
+db.products || [];
+
+const product =
+products.find(
+p =>
+String(p.id) ===
+String(req.params.id)
+);
+
+if(!product){
+
+return res.json({
+success:false,
+message:"Produk tidak ditemukan"
+});
+
+}
+
+if(
+String(product.sellerId)
+!== String(req.session.userId)
+){
+
+return res.json({
+success:false,
+message:"Bukan produk milik anda"
+});
+
+}
+
+product.title =
+req.body.title ||
+product.title;
+
+product.description =
+req.body.description ||
+product.description;
+
+product.price =
+req.body.price ||
+product.price;
+
+if(req.body.oldPrice){
+
+product.oldPrice =
+req.body.oldPrice;
+
+}
+
+await writeDB(
+"products.json",
+{
+products
+}
+);
+
+res.json({
+success:true
+});
+
+}catch(err){
+
+console.log(err);
+
+res.status(500).json({
+success:false
+});
+
+}
+
+}
+);
+
+/* =========================
+   PROFILE
+========================= */
+
+app.get(
+"/api/profile",
+requireLogin,
+async(req,res)=>{
+
+try{
+
+const userDB =
+await readDB(
+"users.json"
+);
+
+const productDB =
+await readDB(
+"products.json"
+);
+
+const followDB =
+await readDB(
+"follows.json"
+);
+
+const user =
+(userDB.users||[])
+.find(
+u=>
+u.id===
+req.session.userId
+);
+
+if(!user){
+
+return res.status(404).json({
+success:false
+});
+
+}
+
+const products =
+(productDB.products||[])
+.filter(
+p=>
+String(p.sellerId)===
+String(user.id)
+);
+
+const productCount =
+products.filter(
+p=>
+p.status==="active"
+).length;
+
+const soldCount =
+products.filter(
+p=>
+p.status==="sold"
+).length;
+
+const follows =
+followDB.follows||[];
+
+
+const friendCount =
+follows.filter(f1=>
+
+String(f1.followerId)===
+String(user.id)
+
+&&
+
+follows.some(f2=>
+
+String(f2.followerId)===
+String(f1.sellerId)
+
+&&
+
+String(f2.sellerId)===
+String(user.id)
+
+)
+
+).length;
+
+res.json({
+
+success:true,
+
+user,
+
+stats:{
+
+products:productCount,
+
+friends:friendCount,
+
+sold:soldCount
+
+}
+
+});
+
+}catch(err){
+
+console.log(err);
+
+res.status(500).json({
+success:false,
+message:err.message
+});
+
+}
+
+}
+);
+
+/* =========================
+   UPDATE PROFILE
+========================= */
+
+app.put(
+  "/api/profile",
+  requireLogin,
+  async (req, res) => {
+
+    const db =
+      await readDB(
+        "users.json"
+      );
+
+    const users =
+      db.users || [];
+
+    const user =
+      users.find(
+        u =>
+          u.id ===
+          req.session.userId
+      );
+
+    if (!user) {
+
+      return res.status(404).json({
+        success: false
+      });
+
+    }
+
+    user.username =
+      req.body.username ||
+      user.username;
+
+    user.bio =
+      req.body.bio ||
+      user.bio;
+
+    user.city =
+      req.body.city ||
+      user.city;
+
+    await writeDB(
+      "users.json",
+      { users }
+    );
+
+    res.json({
+      success: true,
+      message:
+        "Profil diperbarui"
+    });
+
+  }
+);
+
+/* =========================
+   UPLOAD AVATAR
+========================= */
+
+app.post(
+  "/api/profile/avatar",
+  requireLogin,
+  uploadProfile.single(
+    "avatar"
+  ),
+  async (req, res) => {
+
+    const db =
+      await readDB(
+        "users.json"
+      );
+
+    const users =
+      db.users || [];
+
+    const user =
+      users.find(
+        u =>
+          u.id ===
+          req.session.userId
+      );
+
+    if (!user) {
+
+      return res.status(404).json({
+        success: false
+      });
+
+    }
+
+    user.avatar =
+      "/uploads/profiles/" +
+      req.file.filename;
+
+    await writeDB(
+      "users.json",
+      { users }
+    );
+
+    res.json({
+      success: true,
+      avatar:
+        user.avatar
+    });
+
+  }
+);
+
+/* =========================
+   FOLLOW SELLER
+========================= */
+
+app.post(
+  "/api/follow/:sellerId",
+  requireLogin,
+  async (req, res) => {
+
+    try {
+
+      const sellerId =
+        Number(
+          req.params.sellerId
+        );
+
+      const db =
+        await readDB(
+          "follows.json"
+        );
+
+      const follows =
+        db.follows || [];
+
+      const exists =
+        follows.find(
+          f =>
+            f.followerId ===
+              req.session.userId &&
+            f.sellerId ===
+              sellerId
+        );
+
+      if (exists) {
+
+        return res.json({
+          success: false,
+          message:
+            "Sudah follow"
+        });
+
+      }
+
+      follows.push({
+        followerId:
+          req.session.userId,
+        sellerId,
+        createdAt:
+          Date.now()
+      });
+
+      await writeDB(
+        "follows.json",
+        { follows }
+      );
+
+     const users =
+(await readDB("users.json")).users || [];
+
+const fromUser =
+users.find(
+u => String(u.id) === String(req.session.userId)
+);
+
+await addNotification(
+
+sellerId,
+
+"follow",
+
+req.session.userId,
+
+`${fromUser.username} mengikuti Anda`
+
+);
+
+      res.json({
+        success: true,
+        message:
+          "Berhasil follow"
+      });
+
+    } catch {
+
+      res.status(500).json({
+        success: false
+      });
+
+    }
+  }
+);
+
+/* =========================
+   UNFOLLOW SELLER
+========================= */
+
+app.delete(
+  "/api/follow/:sellerId",
+  requireLogin,
+  async (req, res) => {
+
+    try {
+
+      const sellerId =
+        Number(
+          req.params.sellerId
+        );
+
+      const db =
+        await readDB(
+          "follows.json"
+        );
+
+      let follows =
+        db.follows || [];
+
+      follows =
+        follows.filter(
+          f =>
+            !(
+              f.followerId ===
+                req.session.userId &&
+              f.sellerId ===
+                sellerId
+            )
+        );
+
+      await writeDB(
+        "follows.json",
+        { follows }
+      );
+
+      res.json({
+        success: true
+      });
+
+    } catch {
+
+      res.status(500).json({
+        success: false
+      });
+
+    }
+  }
+);
+
+/* =========================
+   SELLER PROFILE
+========================= */
+
+app.get(
+  "/api/seller/:id",
+  requireLogin,
+ async (req, res) => {
+
+    try {
+
+      const sellerId =
+        Number(
+          req.params.id
+        );
+
+      const userDB =
+        await readDB(
+          "users.json"
+        );
+
+      const productDB =
+        await readDB(
+          "products.json"
+        );
+
+      const followDB =
+        await readDB(
+          "follows.json"
+        );
+
+      const users =
+        userDB.users || [];
+
+      const products =
+        productDB.products || [];
+
+      const follows =
+        followDB.follows || [];
+
+      const seller =
+        users.find(
+          u =>
+            u.id ===
+            sellerId
+        );
+
+      if (!seller) {
+
+        return res.status(404).json({
+          success: false,
+          message:
+            "Seller tidak ditemukan"
+        });
+
+      }
+
+      const sellerProducts =
+        products.filter(
+          p =>
+            p.sellerId ===
+              sellerId &&
+            p.status ===
+              "active"
+        );
+
+      const soldCount =
+products.filter(
+p=>
+p.sellerId===sellerId &&
+p.status==="sold"
+).length;
+
+const friendCount =
+follows.filter(f1=>
+
+String(f1.followerId)===
+String(sellerId)
+
+&&
+
+follows.some(f2=>
+
+String(f2.followerId)===
+String(f1.sellerId)
+
+&&
+
+String(f2.sellerId)===
+String(sellerId)
+
+)
+
+).length;
+
+const viewerId =
+req.session?.userId;
+
+const isFollowing =
+follows.some(f=>
+
+String(f.followerId)===
+String(viewerId)
+
+&&
+
+String(f.sellerId)===
+String(sellerId)
+
+);
+
+const isFriend =
+
+isFollowing
+
+&&
+
+follows.some(f=>
+
+String(f.followerId)===
+String(sellerId)
+
+&&
+
+String(f.sellerId)===
+String(viewerId)
+
+);
+
+      res.json({
+  success: true,
+  seller,
+  friendCount,
+  soldCount,
+  isFollowing,
+  isFriend,
+  products: sellerProducts
+});
+    } catch {
+
+      res.status(500).json({
+        success: false
+      });
+
+    }
+  }
+);
+
+/* =========================
+   SISTEM FOLLOW
+========================= */
+
+app.post(
+"/api/follow/:id",
+requireLogin,
+async(req,res)=>{
+
+try{
+
+const followDB=
+await readDB("follows.json");
+
+const follows=
+followDB.follows||[];
+
+const followerId=
+req.session.userId;
+
+const followingId=
+Number(req.params.id);
+
+if(
+String(followerId)===
+String(followingId)
+){
+
+return res.json({
+success:false,
+message:"Tidak bisa mengikuti akun sendiri."
+});
+
+}
+
+const exist=
+follows.find(f=>
+
+String(f.followerId)===String(followerId)
+
+&&
+
+String(f.sellerId)===String(followingId)
+
+);
+
+if(exist){
+
+return res.json({
+success:false,
+message:"Sudah mengikuti"
+});
+
+}
+
+follows.push({
+  followerId,
+  sellerId: followingId,
+  createdAt: Date.now()
+});
+
+followDB.follows=follows;
+
+await writeDB(
+"follows.json",
+followDB
+);
+
+const isFriend =
+follows.some(f=>
+
+String(f.followerId)===
+String(followingId)
+
+&&
+
+String(f.sellerId)===
+String(followerId)
+
+);
+
+res.json({
+
+success:true,
+
+isFriend
+
+});
+
+}catch(err){
+
+console.log(err);
+
+res.json({
+success:false
+});
+
+}
+
+}
+);
+
+/* =========================
+   ADD FAVORITE
+========================= */
+
+app.post(
+  "/api/favorites/:productId",
+  requireLogin,
+  async (req, res) => {
+
+    const productId =
+      Number(
+        req.params.productId
+      );
+
+    const db =
+      await readDB(
+        "favorites.json"
+      );
+
+    const favorites =
+      db.favorites || [];
+
+    const exists =
+      favorites.find(
+        f =>
+          f.userId ===
+            req.session.userId &&
+          f.productId ===
+            productId
+      );
+
+    if (exists) {
+
+      return res.json({
+        success: false,
+        message:
+          "Sudah difavoritkan"
+      });
+
+    }
+
+    favorites.push({
+      userId:
+        req.session.userId,
+      productId,
+      createdAt:
+        Date.now()
+    });
+
+    await writeDB(
+      "favorites.json",
+      { favorites }
+    );
+
+    res.json({
+      success: true
+    });
+
+  }
+);
+
+/* =========================
+   GET FAVORITES
+========================= */
+
+app.get(
+  "/api/favorites",
+  requireLogin,
+  async (req, res) => {
+
+    const favDB =
+      await readDB(
+        "favorites.json"
+      );
+
+    const productDB =
+      await readDB(
+        "products.json"
+      );
+
+    const favorites =
+      favDB.favorites || [];
+
+    const products =
+      productDB.products || [];
+
+    const result =
+      favorites
+        .filter(
+          f =>
+            f.userId ===
+            req.session.userId
+        )
+        .map(
+          f =>
+            products.find(
+              p =>
+                p.id ===
+                f.productId
+            )
+        )
+        .filter(Boolean);
+
+    res.json({
+      success: true,
+      products: result
+    });
+
+  }
+);
+
+/* =========================
+   REMOVE FAVORITE
+========================= */
+
+app.delete(
+"/api/favorites/:productId",
+requireLogin,
+async(req,res)=>{
+
+try{
+
+const db =
+await readDB(
+"favorites.json"
+);
+
+let favorites =
+db.favorites || [];
+
+favorites =
+favorites.filter(
+f =>
+!(
+String(f.userId) ===
+String(req.session.userId)
+&&
+String(f.productId) ===
+String(req.params.productId)
+)
+);
+
+await writeDB(
+"favorites.json",
+{
+favorites
+}
+);
+
+res.json({
+success:true
+});
+
+}catch(err){
+
+console.log(err);
+
+res.status(500).json({
+success:false
+});
+
+}
+
+}
+);
+
+/* =========================
+   CHAT SEND
+========================= */
+
+app.post(
+  "/api/chat/send",
+  requireLogin,
+  async (req, res) => {
+
+    try {
+
+      const {
+        productId,
+        toUserId,
+        message
+      } = req.body;
+
+      if (!message) {
+
+        return res.status(400).json({
+          success: false,
+          message: "Pesan kosong"
+        });
+
+      }
+
+      const db =
+        await readDB(
+          "chats.json"
+        );
+
+      const chats =
+        db.chats || [];
+
+      const chat = {
+        id: generateId(),
+        productId:
+          Number(productId) || 0,
+        fromUserId:
+          req.session.userId,
+        toUserId:
+          Number(toUserId),
+        message,
+        read: false,
+        createdAt:
+          Date.now()
+      };
+
+      chats.push(chat);
+
+      await writeDB(
+        "chats.json",
+        { chats }
+      );
+
+      res.json({
+        success: true,
+        chat
+      });
+
+    } catch {
+
+      res.status(500).json({
+        success: false
+      });
+
+    }
+  }
+);
+
+/* =========================
+   UPLOAD FOTO CHAT
+========================= */
+
+app.post(
+"/api/chat/upload",
+requireLogin,
+uploadChat.single("image"),
+async(req,res)=>{
+
+try{
+
+res.json({
+success:true,
+image:
+"/uploads/chat/" +
+req.file.filename
+});
+
+}catch(err){
+
+res.status(500).json({
+success:false
+});
+
+}
+
+}
+);
+
+/* =========================
+   Share My Product
+========================= */
+
+app.get(
+"/api/my-products",
+requireLogin,
+async(req,res)=>{
+
+const db =
+await readDB(
+"products.json"
+);
+
+const products =
+(db.products||[])
+.filter(
+p =>
+p.sellerId ===
+req.session.userId
+);
+
+res.json({
+success:true,
+products
+});
+
+}
+);
+
+/* =========================
+   CHAT ROOM
+========================= */
+
+app.get(
+  "/api/chat/:userId",
+  requireLogin,
+  async (req, res) => {
+
+    try {
+
+      const targetUserId =
+        Number(
+          req.params.userId
+        );
+
+      const db =
+        await readDB(
+          "chats.json"
+        );
+
+      const chats =
+        db.chats || [];
+
+      const messages =
+        chats.filter(
+          c =>
+            (
+              c.fromUserId ===
+                req.session.userId &&
+              c.toUserId ===
+                targetUserId
+            ) ||
+            (
+              c.fromUserId ===
+                targetUserId &&
+              c.toUserId ===
+                req.session.userId
+            )
+        );
+
+messages.forEach(msg=>{
+
+if(
+msg.toUserId === req.session.userId
+){
+
+msg.read = true;
+
+}
+
+});
+
+      messages.sort(
+        (a, b) =>
+          a.createdAt -
+          b.createdAt
+      );
+
+let roomProductId = 0;
+
+const lastProductChat =
+[...messages]
+.reverse()
+.find(
+m => m.productId
+);
+
+if(lastProductChat){
+
+roomProductId =
+lastProductChat.productId;
+
+}
+
+await writeDB(
+"chats.json",
+{
+chats
+}
+);
+
+res.json({
+  success: true,
+  messages,
+  productId:
+    roomProductId
+});
+
+    } catch {
+
+      res.status(500).json({
+        success: false
+      });
+
+    }
+  }
+);
+
+/* =========================
+   CHAT TYPING
+========================= */
+
+app.post(
+"/api/chat/typing",
+requireLogin,
+(req,res)=>{
+
+typingUsers[
+req.session.userId
+] = true;
+
+res.json({
+success:true
+});
+
+}
+);
+
+app.post(
+"/api/chat/stop-typing",
+requireLogin,
+(req,res)=>{
+
+delete typingUsers[
+req.session.userId
+];
+
+res.json({
+success:true
+});
+
+}
+);
+
+app.get(
+"/api/chat/typing/:userId",
+requireLogin,
+(req,res)=>{
+
+res.json({
+typing:
+typingUsers[
+req.params.userId
+] || false
+});
+
+}
+);
+
+/* =========================
+   CHAT USER INFO
+========================= */
+
+app.get(
+"/api/user/:id",
+requireLogin,
+async(req,res)=>{
+
+try{
+
+const db =
+await readDB(
+"users.json"
+);
+
+const user =
+(db.users||[])
+.find(
+u=>
+String(u.id)===
+String(req.params.id)
+);
+
+if(!user){
+
+return res.json({
+success:false
+});
+
+}
+
+res.json({
+success:true,
+user:{
+id:user.id,
+username:user.username,
+avatar:user.avatar,
+lastActive:user.lastActive,
+
+online:
+(
+Date.now() -
+(user.lastActive || 0)
+) < 60000
+
+}
+});
+
+}catch(err){
+
+res.status(500).json({
+success:false
+});
+
+}
+
+}
+);
+
+/* =========================
+   REVIEWS PRODUCT CHAT
+========================= */
+
+app.get(
+"/api/product-info/:id",
+async(req,res)=>{
+
+const db =
+await readDB(
+"products.json"
+);
+
+const product =
+(db.products||[])
+.find(
+p=>
+String(p.id)===
+String(req.params.id)
+);
+
+res.json({
+success:true,
+product
+});
+
+}
+);
+
+/* =========================
+   INBOX
+========================= */
+
+app.get(
+  "/api/inbox",
+  requireLogin,
+  async (req, res) => {
+
+    try {
+
+      const chatDB =
+        await readDB(
+          "chats.json"
+        );
+
+      const userDB =
+        await readDB(
+          "users.json"
+        );
+
+      const chats =
+        chatDB.chats || [];
+
+      const users =
+        userDB.users || [];
+
+      const inboxMap =
+        new Map();
+
+      chats.forEach(chat => {
+
+        if (
+          chat.fromUserId ===
+            req.session.userId ||
+          chat.toUserId ===
+            req.session.userId
+        ) {
+
+          const otherUserId =
+            chat.fromUserId ===
+            req.session.userId
+              ? chat.toUserId
+              : chat.fromUserId;
+
+          inboxMap.set(
+            otherUserId,
+            chat
+          );
+
+        }
+
+      });
+
+      const inbox =
+        Array.from(
+          inboxMap.values()
+        ).map(chat => {
+
+          const otherUser =
+            users.find(
+              u =>
+                u.id ===
+                (
+                  chat.fromUserId ===
+                  req.session.userId
+                    ? chat.toUserId
+                    : chat.fromUserId
+                )
+            );
+
+         const unreadCount =
+chats.filter(
+c =>
+c.fromUserId === otherUser?.id
+&&
+c.toUserId === req.session.userId
+&&
+!c.read
+).length;
+
+return {
+id:otherUser?.id,
+name:otherUser?.username || "User",
+avatar:otherUser?.avatar || "/uploads/profiles/default-avatar.png",
+lastMessage:chat.message,
+time:chat.createdAt,
+unreadCount
+};
+
+        });
+
+      res.json({
+        success: true,
+        chats: inbox
+      });
+
+    } catch {
+
+      res.status(500).json({
+        success: false
+      });
+
+    }
+  }
+);
+
+/* =========================
+   GET NOTIFICATIONS
+========================= */
+
+app.get(
+  "/api/notifications",
+  requireLogin,
+  async (req, res) => {
+
+    const db =
+      await readDB(
+        "notifications.json"
+      );
+
+    const notifications =
+      (db.notifications || [])
+      .filter(
+        n =>
+          n.userId ===
+          req.session.userId
+      )
+      .sort(
+        (a,b) =>
+          b.createdAt -
+          a.createdAt
+      );
+
+    res.json({
+      success:true,
+      notifications
+    });
+
+  }
+);
+
+/* =========================
+   UNREAD NOTIFICATIONS
+========================= */
+
+app.get(
+"/api/notifications/unread",
+requireLogin,
+async(req,res)=>{
+
+const db=
+await readDB(
+"notifications.json"
+);
+
+const count=
+(db.notifications||[])
+
+.filter(n=>
+
+n.userId===
+req.session.userId
+
+&&
+
+!n.read
+
+).length;
+
+res.json({
+
+success:true,
+
+count
+
+});
+
+}
+);
+
+/* =========================
+   CREATE ORDER
+========================= */
+
+app.post(
+  "/api/orders",
+  requireLogin,
+  async (req,res) => {
+
+    const {
+      productId,
+      sellerId,
+      meetingPoint,
+      meetingDate,
+      meetingTime
+    } = req.body;
+
+    const db =
+      await readDB(
+        "orders.json"
+      );
+
+    const orders =
+      db.orders || [];
+
+    const order = {
+      id: generateId(),
+      productId:
+        Number(productId),
+      buyerId:
+        req.session.userId,
+      sellerId:
+        Number(sellerId),
+      meetingPoint,
+      meetingDate,
+      meetingTime,
+      status:"pending",
+      createdAt:
+        Date.now()
+    };
+
+    orders.push(order);
+
+    await writeDB(
+      "orders.json",
+      { orders }
+    );
+
+    res.json({
+      success:true,
+      order
+    });
+
+  }
+);
+
+/* =========================
+   GET ORDERS
+========================= */
+
+app.get(
+  "/api/orders",
+  requireLogin,
+  async (req,res) => {
+
+    const db =
+      await readDB(
+        "orders.json"
+      );
+
+    const orders =
+      (db.orders || [])
+      .filter(
+        o =>
+          o.buyerId ===
+            req.session.userId ||
+          o.sellerId ===
+            req.session.userId
+      );
+
+    res.json({
+      success:true,
+      orders
+    });
+
+  }
+);
+
+/* =========================
+   REVIEW SELLER
+========================= */
+
+app.post(
+  "/api/review",
+  requireLogin,
+  async (req,res) => {
+
+    const {
+      sellerId,
+      rating,
+      comment
+    } = req.body;
+
+    const db =
+      await readDB(
+        "reviews.json"
+      );
+
+    const reviews =
+      db.reviews || [];
+
+    reviews.push({
+      id: generateId(),
+      sellerId:
+        Number(sellerId),
+      buyerId:
+        req.session.userId,
+      rating:
+        Number(rating),
+      comment:
+        comment || "",
+      createdAt:
+        Date.now()
+    });
+
+    await writeDB(
+      "reviews.json",
+      { reviews }
+    );
+
+    res.json({
+      success:true
+    });
+
+  }
+);
+
+/* =========================
+   ADMIN DASHBOARD
+========================= */
+
+app.get(
+"/api/admin",
+requireLogin,
+requireAdmin,
+async(req,res)=>{
+
+const users=
+(await readDB("users.json")).users||[];
+
+const products=
+(await readDB("products.json")).products||[];
+
+const reports=
+(await readDB("reports.json")).reports||[];
+
+const orders=
+(await readDB("orders.json")).orders||[];
+
+const verifications=
+(await readDB("verifications.json")).verifications||[];
+
+res.json({
+
+success:true,
+
+stats:{
+
+users:users.length,
+
+products:products.length,
+
+reports:reports.length,
+
+orders:orders.length,
+
+verifications:
+verifications.filter(
+v=>v.status==="pending"
+).length
+
+}
+
+});
+
+}
+);
+
+/* =========================
+   GET APPEALS
+========================= */
+
+app.get(
+"/api/admin/appeals",
+requireLogin,
+requireAdmin,
+async(req,res)=>{
+
+const appealsDB=
+await readDB("appeals.json");
+
+const productsDB=
+await readDB("products.json");
+
+const usersDB=
+await readDB("users.json");
+
+const appeals=
+appealsDB.appeals||[];
+
+const products=
+productsDB.products||[];
+
+const users=
+usersDB.users||[];
+
+const data=
+appeals.map(a=>{
+
+const product=
+products.find(
+p=>String(p.id)===String(a.productId)
+);
+
+const seller=
+users.find(
+u=>String(u.id)===String(a.sellerId)
+);
+
+return{
+
+...a,
+
+productTitle:
+product?.title||"-",
+
+sellerName:
+seller?.username||"-",
+
+adminReason:
+product?.disableReason||"-"
+
+};
+
+});
+
+res.json({
+
+success:true,
+
+appeals:data
+
+});
+
+}
+);
+
+/* =========================
+   APPROVE APPEAL
+========================= */
+
+app.put(
+"/api/admin/appeals/approve/:id",
+requireLogin,
+requireAdmin,
+async(req,res)=>{
+
+const appealsDB=
+await readDB("appeals.json");
+
+const productsDB=
+await readDB("products.json");
+
+const notificationsDB=
+await readDB("notifications.json");
+
+const appeal=
+(appealsDB.appeals||[]).find(
+a=>String(a.id)===String(req.params.id)
+);
+
+if(!appeal){
+
+return res.json({
+success:false,
+message:"Banding tidak ditemukan"
+});
+
+}
+
+if(appeal.status!=="pending"){
+
+return res.json({
+success:false,
+message:"Banding sudah diproses"
+});
+
+}
+
+const product=
+(productsDB.products||[]).find(
+p=>String(p.id)===String(appeal.productId)
+);
+
+if(product){
+
+product.status="active";
+
+delete product.disableReason;
+delete product.disabledAt;
+delete product.disabledBy;
+
+}
+
+appeal.status="approved";
+
+notificationsDB.notifications.push({
+
+id:generateId(),
+
+userId:appeal.sellerId,
+
+type:"system",
+
+title:"Banding Diterima",
+
+message:`Banding produk "${product.title}" diterima. Produk aktif kembali.`,
+
+read:false,
+
+createdAt:Date.now()
+
+});
+
+await writeDB(
+"appeals.json",
+appealsDB
+);
+
+await writeDB(
+"products.json",
+productsDB
+);
+
+await writeDB(
+"notifications.json",
+notificationsDB
+);
+
+res.json({
+
+success:true,
+message:"Banding diterima"
+
+});
+
+}
+);
+
+/* =========================
+   REJECT APPEAL
+========================= */
+
+app.put(
+"/api/admin/appeals/reject/:id",
+requireLogin,
+requireAdmin,
+async(req,res)=>{
+
+const appealsDB=
+await readDB("appeals.json");
+
+const notificationsDB=
+await readDB("notifications.json");
+
+const appeal=
+(appealsDB.appeals||[]).find(
+a=>String(a.id)===String(req.params.id)
+);
+
+if(!appeal){
+
+return res.json({
+success:false,
+message:"Banding tidak ditemukan"
+});
+
+}
+
+if(appeal.status!=="pending"){
+
+return res.json({
+success:false,
+message:"Banding sudah diproses"
+});
+
+}
+
+appeal.status="rejected";
+
+notificationsDB.notifications.push({
+
+id:generateId(),
+
+userId:appeal.sellerId,
+
+type:"system",
+
+title:"Banding Ditolak",
+
+message:"Banding Anda ditolak. Produk tetap dinonaktifkan.",
+
+read:false,
+
+createdAt:Date.now()
+
+});
+
+await writeDB(
+"appeals.json",
+appealsDB
+);
+
+await writeDB(
+"notifications.json",
+notificationsDB
+);
+
+res.json({
+
+success:true,
+
+message:"Banding berhasil ditolak"
+
+});
+
+}
+);
+
+/* =========================
+   ADMIN USERS
+========================= */
+
+app.get(
+"/api/admin/users",
+requireLogin,
+requireAdmin,
+async(req,res)=>{
+
+const users=
+(await readDB("users.json")).users||[];
+
+res.json({
+
+success:true,
+
+users:users.map(u=>({
+
+id:u.id,
+
+username:u.username,
+
+email:u.email,
+
+role:u.role,
+
+verified:u.verified,
+
+blocked:u.blocked,
+
+joinedAt:u.joinedAt
+
+}))
+
+});
+
+}
+);
+
+/* =========================
+   UBAH ROLE USER
+========================= */
+
+app.put(
+"/api/admin/role/:id",
+requireLogin,
+requireAdmin,
+async(req,res)=>{
+
+const userId=
+Number(req.params.id);
+
+const {role}=
+req.body;
+
+const roles=[
+"user",
+"moderator",
+"admin",
+"owner"
+];
+
+if(!roles.includes(role)){
+
+return res.json({
+success:false,
+message:"Role tidak valid"
+});
+
+}
+
+const db=
+await readDB(
+"users.json"
+);
+
+const admin=
+(db.users||[]).find(
+u=>String(u.id)===String(req.session.userId)
+);
+
+const user=
+(db.users||[]).find(
+u=>u.id===userId
+);
+
+if(!user){
+
+return res.json({
+success:false,
+message:"User tidak ditemukan"
+});
+
+}
+
+// Hanya Owner yang boleh mengubah role
+if(admin.role!=="owner"){
+
+return res.json({
+success:false,
+message:"Hanya Owner yang dapat mengubah role user"
+});
+
+}
+
+// Tidak boleh mengubah role sendiri
+if(user.id===admin.id){
+
+return res.json({
+success:false,
+message:"Anda tidak dapat mengubah role akun sendiri"
+});
+
+}
+
+// Owner lain tidak boleh diubah
+if(user.role==="owner"){
+
+return res.json({
+success:false,
+message:"Role Owner dilindungi sistem"
+});
+
+}
+
+user.role=role;
+
+await writeDB(
+"users.json",
+db
+);
+
+res.json({
+success:true,
+message:"Role berhasil diubah menjadi "+role
+});
+
+}
+);
+
+/* =========================
+   DELETE USER
+========================= */
+
+app.delete(
+"/api/admin/users/:id",
+requireLogin,
+requireAdmin,
+async(req,res)=>{
+
+const userId=Number(req.params.id);
+
+const db=
+await readDB("users.json");
+
+const user=
+db.users.find(
+u=>String(u.id)===String(userId)
+);
+
+if(!user){
+
+return res.json({
+success:false,
+message:"User tidak ditemukan"
+});
+
+}
+
+const admin=
+db.users.find(
+u=>String(u.id)===String(req.session.userId)
+);
+
+// Tidak boleh menghapus diri sendiri
+if(
+String(user.id)===
+String(admin.id)
+){
+
+return res.json({
+success:false,
+message:"Anda tidak dapat menghapus akun sendiri"
+});
+
+}
+
+// Owner tidak boleh dihapus
+if(
+user.role==="owner"
+){
+
+return res.json({
+success:false,
+message:"Akun Owner dilindungi sistem"
+});
+
+}
+
+// Admin biasa tidak boleh menghapus Admin/Moderator
+if(
+admin.role!=="owner"
+&&
+(
+user.role==="admin"||
+user.role==="moderator"
+)
+){
+
+return res.json({
+success:false,
+message:"Hanya Owner yang dapat menghapus Admin atau Moderator"
+});
+
+}
+
+db.users=
+(db.users||[]).filter(
+u=>u.id!==userId
+);
+
+await writeDB(
+"users.json",
+db
+);
+
+res.json({
+success:true,
+message:"User berhasil dihapus"
+});
+
+}
+);
+
+/* =========================
+   BLOKIR AKUN
+========================= */
+
+app.put(
+"/api/admin/block/:id",
+requireLogin,
+requireAdmin,
+async(req,res)=>{
+
+const db=
+await readDB("users.json");
+
+const user=
+(db.users||[]).find(
+u=>String(u.id)===String(req.params.id)
+);
+
+if(!user){
+
+return res.json({
+success:false
+});
+
+}
+
+const admin=
+db.users.find(
+u=>String(u.id)===String(req.session.userId)
+);
+
+// Tidak boleh memblokir diri sendiri
+if(
+String(user.id)===
+String(admin.id)
+){
+
+return res.json({
+success:false,
+message:"Anda tidak dapat memblokir akun sendiri"
+});
+
+}
+
+// Owner tidak boleh diblokir
+if(
+user.role==="owner"
+){
+
+return res.json({
+success:false,
+message:"Akun Owner dilindungi sistem"
+});
+
+}
+
+// Admin tidak boleh memblokir admin lain
+if(
+admin.role!=="owner"
+&&
+(
+user.role==="admin"||
+user.role==="moderator"
+)
+){
+
+return res.json({
+success:false,
+message:"Hanya Owner yang dapat memblokir Admin atau Moderator"
+});
+
+}
+
+user.blocked=
+!user.blocked;
+
+await writeDB(
+"users.json",
+db
+);
+
+res.json({
+success:true,
+blocked:user.blocked,
+message:
+user.blocked
+?
+"User berhasil diblokir"
+:
+"Blokir berhasil dibuka"
+});
+
+}
+);
+
+/* =========================
+   ADMIN PRODUCTS
+========================= */
+
+app.get(
+"/api/admin/products",
+requireLogin,
+requireAdmin,
+async(req,res)=>{
+
+const db=
+await readDB("products.json");
+
+res.json({
+
+success:true,
+
+products:db.products||[]
+
+});
+
+}
+);
+
+/* =========================
+   NONAKTIFKAN PRODUK
+========================= */
+
+app.put(
+"/api/admin/products/:id/disable",
+requireLogin,
+requireAdmin,
+async(req,res)=>{
+
+const db=
+await readDB("products.json");
+
+const products=
+db.products||[];
+
+const product=
+products.find(
+p=>String(p.id)===String(req.params.id)
+);
+
+const {reason}=req.body;
+
+if(!product){
+
+return res.json({
+success:false,
+message:"Produk tidak ditemukan"
+});
+
+}
+
+// Sudah dinonaktifkan
+if(product.status==="disabled"){
+
+return res.json({
+success:false,
+message:"Produk sudah dinonaktifkan"
+});
+
+}
+
+product.status="disabled";
+
+product.disableReason=
+reason||"Melanggar Aturan Marketplace";
+
+product.disabledAt=Date.now();
+
+product.disabledBy=req.session.userId;
+
+const notifDB=
+await readDB(
+"notifications.json"
+);
+
+const notifications=
+notifDB.notifications||[];
+
+notifications.push({
+
+id:generateId(),
+
+userId:product.sellerId,
+
+type:"product_disabled",
+
+productId:product.id,
+
+appealed:false,
+
+title:"Produk Dinonaktifkan",
+
+message:`Produk "${product.title}" dinonaktifkan.\nAlasan: ${reason}`,
+
+read:false,
+
+createdAt:Date.now()
+
+});
+
+await writeDB(
+"notifications.json",
+{
+notifications
+}
+);
+
+await writeDB(
+"products.json",
+db
+);
+
+res.json({
+success:true,
+message:"Produk berhasil dinonaktifkan"
+});
+
+}
+);
+
+/* =========================
+   AJUKAN BANDING
+========================= */
+
+app.post(
+"/api/appeals",
+requireLogin,
+async(req,res)=>{
+
+const {
+
+productId,
+
+reason
+
+}=req.body;
+
+const db=
+await readDB("appeals.json");
+
+(db.appeals||=[]).push({
+
+id:generateId(),
+
+productId,
+
+sellerId:req.session.userId,
+
+reason,
+
+status:"pending",
+
+createdAt:Date.now()
+
+});
+
+await writeDB(
+"appeals.json",
+db
+);
+
+res.json({
+
+success:true,
+
+message:"Banding berhasil dikirim"
+
+});
+
+}
+);
+
+/* =========================
+   VIEW ROUTES
+========================= */
+
+app.get("/", (req,res)=>{
+  res.sendFile(
+    path.join(
+      __dirname,
+      "views",
+      "login.html"
+    )
+  );
+});
+
+app.get("/login", (req, res) => {
+  res.sendFile(
+    path.join(
+      __dirname,
+      "views",
+      "login.html"
+    )
+  );
+});
+
+app.get("/register", (req, res) => {
+  res.sendFile(
+    path.join(
+      __dirname,
+      "views",
+      "register.html"
+    )
+  );
+});
+
+app.get("/home",(req,res)=>{
+  res.sendFile(
+    path.join(
+      __dirname,
+      "views",
+      "home.html"
+    )
+  );
+});
+
+app.get("/product",(req,res)=>{
+  res.sendFile(
+    path.join(
+      __dirname,
+      "views",
+      "product.html"
+    )
+  );
+});
+
+app.get("/add-product",(req,res)=>{
+  res.sendFile(
+    path.join(
+      __dirname,
+      "views",
+      "add-product.html"
+    )
+  );
+});
+
+app.get("/profile",(req,res)=>{
+  res.sendFile(
+    path.join(
+      __dirname,
+      "views",
+      "profile.html"
+    )
+  );
+});
+
+app.get("/edit-profile",(req,res)=>{
+  res.sendFile(
+    path.join(
+      __dirname,
+      "views",
+      "edit-profile.html"
+    )
+  );
+
+});
+
+app.get("/favorites",(req,res)=>{
+  res.sendFile(
+    path.join(
+      __dirname,
+      "views",
+      "favorites.html"
+    )
+  );
+});
+
+app.get("/inbox",(req,res)=>{
+  res.sendFile(
+    path.join(
+      __dirname,
+      "views",
+      "inbox.html"
+    )
+  );
+});
+
+app.get("/chat",(req,res)=>{
+  res.sendFile(
+    path.join(
+      __dirname,
+      "views",
+      "chat.html"
+    )
+  );
+});
+
+app.get("/orders",(req,res)=>{
+  res.sendFile(
+    path.join(
+      __dirname,
+      "views",
+      "orders.html"
+    )
+  );
+});
+
+app.get("/notifications",(req,res)=>{
+  res.sendFile(
+    path.join(
+      __dirname,
+      "views",
+      "notifications.html"
+    )
+  );
+});
+
+app.get("/seller-profile",(req,res)=>{
+  res.sendFile(
+    path.join(
+      __dirname,
+      "views",
+      "seller-profile.html"
+    )
+  );
+});
+
+app.get(
+"/admin",
+requireLogin,
+requireAdmin,
+(req,res)=>{
+
+res.sendFile(
+path.join(
+__dirname,
+"views",
+"admin.html"
+)
+
+);
+
+});
+
+app.get(
+"/admin-users",
+requireLogin,
+requireAdmin,
+(req,res)=>{
+
+res.sendFile(
+path.join(
+__dirname,
+"views",
+"admin-users.html"
+)
+
+);
+
+});
+
+app.get(
+"/admin-products",
+requireLogin,
+requireAdmin,
+(req,res)=>{
+
+res.sendFile(
+path.join(
+__dirname,
+"views",
+"admin-products.html"
+)
+
+);
+
+});
+
+app.get(
+"/admin-appeals",
+requireLogin,
+requireAdmin,
+(req,res)=>{
+
+res.sendFile(
+path.join(
+__dirname,
+"views",
+"admin-appeals.html"
+)
+
+);
+
+});
+
+app.get("/my-products",(req,res)=>{
+  res.sendFile(
+    path.join(
+      __dirname,
+      "views",
+      "my-products.html"
+    )
+  );
+});
+
+app.get("/edit-product",(req,res)=>{
+  res.sendFile(
+    path.join(
+      __dirname,
+      "views",
+      "edit-product.html"
+    )
+  );
+});
+
+app.get("/seller", (req, res) => {
+  res.sendFile(
+    path.join(__dirname, "views", "seller.html")
+  );
+});
+
+/* =========================
+   ROOT
+========================= */
+
+app.get("/", (req, res) => {
+
+  res.redirect(
+    "/login"
+  );
+
+});
+
+/* =========================
+   START SERVER
+========================= */
+
+initializeDatabase()
+  .then(() => {
+
+    app.listen(
+      PORT,
+      () => {
+
+        console.log(
+          `MarketplaceID Running On Port ${PORT}`
+        );
+
+      }
+    );
+
+  })
+  .catch(console.error);

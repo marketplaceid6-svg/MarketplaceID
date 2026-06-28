@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+content="width=device-width,initial-scale=1.0">
+
+<title>Kelola Produk</title>
+
+<link
+rel="stylesheet"
+href="/public/css/style.css"
+>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>
+📦 Kelola Produk
+</h1>
+
+<div id="productList">
+
+<div class="empty">
+
+Memuat produk...
+
+</div>
+
+</div>
+
+<br>
+
+<button
+class="btn-back"
+onclick="location.href='/admin'"
+>
+
+⬅ Kembali
+
+</button>
+
+</div>
+
+<script src="/public/js/config.js"></script>
+
+<script>
+
+async function loadProducts(){
+
+try{
+
+const res=
+await fetch(
+API_URL + "/api/admin/products",
+{
+credentials:"include"
+}
+);
+
+const data=
+await res.json();
+
+const list=
+document.getElementById(
+"productList"
+);
+
+list.innerHTML="";
+
+if(
+!data.products||
+data.products.length===0
+){
+
+list.innerHTML=`
+<div class="empty">
+
+Belum ada produk
+
+</div>
+`;
+
+return;
+
+}
+
+data.products.forEach(product=>{
+
+list.innerHTML+=`
+
+<div class="profile-card">
+
+<img
+src="${
+product.images&&product.images.length
+?product.images[0]
+:"/public/images/no-image.png"
+}"
+style="
+width:100%;
+height:180px;
+object-fit:cover;
+border-radius:15px;
+margin-bottom:15px;
+">
+
+<h2>
+
+${product.title}
+
+</h2>
+
+<p>
+
+👤
+${product.sellerName||"-"}
+
+</p>
+
+<p>
+
+💰 Rp
+${Number(product.price).toLocaleString("id-ID")}
+
+</p>
+
+<p>
+
+📂
+${product.category||"-"}
+
+</p>
+
+<p>
+
+📍
+${product.city||"-"}
+
+</p>
+
+<p>
+
+${
+product.status==="disabled"
+?
+"🔴 Dinonaktifkan"
+:
+product.status==="sold"
+?
+"🟡 Terjual"
+:
+"🟢 Aktif"
+}
+
+</p>
+
+<div class="user-actions">
+
+<button
+class="btn-view"
+onclick="location.href='/product/${product.id}'"
+>
+👁 Lihat
+</button>
+
+<button
+class="btn-disable"
+onclick="disableProduct(${product.id})"
+>
+🚫 Nonaktifkan
+</button>
+
+</div>
+
+</div>
+
+`;
+
+});
+
+}catch(err){
+
+console.log(err);
+
+}
+
+}
+
+async function disableProduct(id){
+
+if(
+!confirm("Nonaktifkan produk ini?")
+)return;
+
+const res=
+await fetch(
+API_URL + "/api/admin/products/"+id+"/disable",
+{
+method:"PUT",
+credentials:"include"
+}
+);
+
+const data=
+await res.json();
+
+alert(data.message);
+
+if(data.success){
+
+loadProducts();
+
+}
+
+}
+
+let selectedProduct=null;
+
+function disableProduct(id){
+
+selectedProduct=id;
+
+document.getElementById(
+"reasonModal"
+).style.display="flex";
+
+}
+
+function closeReason(){
+
+document.getElementById(
+"reasonModal"
+).style.display="none";
+
+}
+
+async function submitDisable(){
+
+const reason=
+document.querySelector(
+'input[name="reason"]:checked'
+).value;
+
+const res=
+await fetch(
+API_URL + "/api/admin/products/"+selectedProduct+"/disable",
+{
+method:"PUT",
+credentials:"include",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+reason
+})
+}
+);
+
+const data=
+await res.json();
+
+alert(data.message);
+
+closeReason();
+
+if(data.success){
+
+loadProducts();
+
+}
+
+}
+
+loadProducts();
+
+</script>
+
+<div id="reasonModal" class="modal" style="display:none;">
+
+<div class="modal-content">
+
+<h2>🚫 Nonaktifkan Produk</h2>
+
+<p>Pilih alasan pelanggaran:</p>
+
+<label>
+<input type="radio" name="reason" value="Spam" checked>
+Spam
+</label><br>
+
+<label>
+<input type="radio" name="reason" value="Barang Terlarang">
+Barang Terlarang
+</label><br>
+
+<label>
+<input type="radio" name="reason" value="Penipuan">
+Penipuan
+</label><br>
+
+<label>
+<input type="radio" name="reason" value="Foto Tidak Sesuai">
+Foto Tidak Sesuai
+</label><br>
+
+<label>
+<input type="radio" name="reason" value="Melanggar Aturan Marketplace">
+Melanggar Aturan Marketplace
+</label>
+
+<br><br>
+
+<button
+class="btn-disable"
+onclick="submitDisable()">
+Simpan
+</button>
+
+<button
+class="btn-delete"
+onclick="closeReason()">
+Batal
+</button>
+
+</div>
+
+</div>
+
+</body>
+
+</html>
+

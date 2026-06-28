@@ -1,0 +1,311 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport"
+content="width=device-width,initial-scale=1">
+
+<title>Profil</title>
+
+<link
+rel="stylesheet"
+href="/public/css/style.css"
+>
+
+<style>
+
+.profile-card{
+background:#0f1625;
+border:1px solid #1f2937;
+border-radius:20px;
+padding:20px;
+text-align:center;
+}
+
+.profile-avatar{
+width:100px;
+height:100px;
+border-radius:50%;
+object-fit:cover;
+border:3px solid #ff3b3b;
+}
+
+.profile-name{
+font-size:22px;
+font-weight:700;
+margin-top:10px;
+}
+
+.profile-email{
+color:#999;
+margin-top:5px;
+}
+
+.profile-bio{
+margin-top:15px;
+line-height:1.5;
+}
+
+.menu{
+margin-top:20px;
+display:flex;
+flex-direction:column;
+gap:10px;
+}
+
+.menu a{
+background:#0f1625;
+border:1px solid #1f2937;
+padding:15px;
+border-radius:15px;
+}
+
+.menu a.logout-btn{
+background:#ff3030;
+color:white;
+border:none;
+}
+
+.edit-btn{
+
+margin-top:15px;
+
+background:#ff3b3b;
+color:white;
+
+border:none;
+
+padding:12px 20px;
+
+border-radius:12px;
+
+font-weight:bold;
+
+}
+
+.profile-stats{
+display:grid;
+grid-template-columns:repeat(3,1fr);
+gap:12px;
+margin:20px 0;
+}
+
+.stat-box{
+background:#111827;
+padding:18px;
+border-radius:18px;
+text-align:center;
+border:1.5px solid rgba(255,59,59,.35);
+box-shadow:0 0 15px rgba(255,59,59,.15);
+transition:.25s;
+}
+
+.stat-box:hover{
+border-color:#ff3b3b;
+box-shadow:0 0 20px rgba(255,59,59,.35);
+transform:translateY(-2px);
+}
+
+.stat-box div{
+font-size:30px;
+font-weight:bold;
+color:#fff;
+}
+
+.stat-box span{
+display:block;
+margin-top:8px;
+color:#aaa;
+font-size:14px;
+}
+
+</style>
+
+</head>
+<body>
+
+<div class="container">
+
+<div
+id="profileCard"
+class="profile-card"
+>
+
+<div class="empty">
+Memuat profil...
+</div>
+
+</div>
+
+<div class="menu">
+
+<a href="/my-products">
+📦 Iklan Saya
+</a>
+
+<a href="/favorites">
+❤️ Favorit
+</a>
+
+<a href="/orders">
+📋 Pesanan
+</a>
+
+<a
+href="#"
+class="logout-btn"
+onclick="logout()"
+>
+🚪 Logout
+</a>
+
+</div>
+
+</div>
+
+<script src="/public/js/config.js"></script>
+
+<script>
+
+async function loadProfile(){
+
+try{
+
+const res =
+await fetch(
+API_URL + "/api/profile",
+{
+credentials:"include"
+}
+);
+
+const data =
+await res.json();
+
+if(!data.user){
+
+location.href =
+"/login";
+
+return;
+
+}
+
+const user =
+data.user;
+
+document.getElementById(
+"profileCard"
+).innerHTML =
+
+`
+<img
+src="${
+user.avatar ||
+'/public/images/default-avatar.png'
+}"
+class="profile-avatar"
+>
+
+<div class="profile-name">
+${user.username}
+</div>
+
+<div class="profile-email">
+${user.email}
+</div>
+
+<div class="profile-bio">
+${user.bio || 'Belum ada bio'}
+</div>
+
+<div class="profile-stats">
+
+<div class="stat-box">
+<div>${data.stats.products}</div>
+<span>Produk</span>
+</div>
+
+<div class="stat-box">
+<div>${data.stats.friends}</div>
+<span>Teman</span>
+</div>
+
+<div class="stat-box">
+<div>${data.stats.sold}</div>
+<span>Terjual</span>
+</div>
+
+</div>
+
+<button
+class="edit-btn"
+onclick="
+location.href='/edit-profile'
+"
+>
+✏️ Edit Profil
+</button>
+
+<button
+id="adminBtn"
+onclick="location.href='/admin'"
+style="
+display:none;
+width:100%;
+height:55px;
+margin-top:15px;
+background:#2563eb;
+color:white;
+border:none;
+border-radius:15px;
+font-size:18px;
+font-weight:bold;
+">
+🛡 Dashboard Admin
+</button>
+
+`;
+
+if(
+user.role==="admin" ||
+user.role==="owner"
+){
+
+document.getElementById(
+"adminBtn"
+).style.display="block";
+
+}
+
+}catch(err){
+
+console.log(err);
+
+}
+
+}
+
+async function logout(){
+
+await fetch(
+API_URL + "/api/logout",
+{
+method:"POST",
+credentials:"include"
+}
+);
+
+location.href =
+"/login";
+
+}
+
+loadProfile();
+
+</script>
+
+</body>
+</html>

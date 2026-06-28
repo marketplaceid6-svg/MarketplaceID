@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport"
+content="width=device-width,initial-scale=1">
+
+<title>Edit Profil</title>
+
+<link
+rel="stylesheet"
+href="/public/css/style.css"
+>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h2 class="section-title">
+Edit Profil
+</h2>
+
+<div class="profile-card">
+
+<label
+class="upload-box"
+id="avatarBox"
+>
+
+📷
+
+<input
+type="file"
+id="avatar"
+hidden
+accept="image/*"
+onchange="previewAvatar(this)"
+>
+
+</label>
+
+<input
+id="username"
+class="input"
+placeholder="Username"
+>
+
+<input
+id="city"
+class="input"
+placeholder="Kota"
+>
+
+<textarea
+id="bio"
+class="input textarea"
+placeholder="Bio"
+></textarea>
+
+<button
+class="btn-submit"
+onclick="saveProfile()"
+>
+Simpan Perubahan
+</button>
+
+</div>
+
+</div>
+
+<script src="/public/js/config.js"></script>
+
+<script>
+
+async function loadProfile(){
+
+const res =
+await fetch(
+API_URL + "/api/profile",
+{
+credentials:"include"
+}
+);
+
+const data =
+await res.json();
+
+document.getElementById(
+"username"
+).value =
+data.user.username || "";
+
+document.getElementById(
+"city"
+).value =
+data.user.city || "";
+
+document.getElementById(
+"bio"
+).value =
+data.user.bio || "";
+
+}
+
+function previewAvatar(input){
+
+const file =
+input.files[0];
+
+if(!file) return;
+
+const reader =
+new FileReader();
+
+reader.onload =
+function(e){
+
+document.getElementById(
+"avatarBox"
+).style.backgroundImage =
+`url(${e.target.result})`;
+
+document.getElementById(
+"avatarBox"
+).style.backgroundSize =
+"cover";
+
+};
+
+reader.readAsDataURL(file);
+
+}
+
+async function saveProfile(){
+
+const body = {
+
+username:
+document.getElementById(
+"username"
+).value,
+
+city:
+document.getElementById(
+"city"
+).value,
+
+bio:
+document.getElementById(
+"bio"
+).value
+
+};
+
+await fetch(
+API_URL + "/api/profile",
+{
+method:"PUT",
+credentials:"include",
+headers:{
+"Content-Type":
+"application/json"
+},
+body:JSON.stringify(body)
+}
+);
+
+const file =
+document.getElementById(
+"avatar"
+).files[0];
+
+if(file){
+
+const fd =
+new FormData();
+
+fd.append(
+"avatar",
+file
+);
+
+await fetch(
+API_URL + "/api/profile/avatar",
+{
+method:"POST",
+credentials:"include",
+body:fd
+}
+);
+
+}
+
+alert(
+"Profil berhasil diperbarui"
+);
+
+location.href =
+"/profile";
+
+}
+
+loadProfile();
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+content="width=device-width,initial-scale=1.0">
+
+<title>Kelola User</title>
+
+<link
+rel="stylesheet"
+href="/public/css/style.css"
+>
+
+<style>
+
+.user-card{
+
+background:#111827;
+
+border:1px solid #1f2937;
+
+border-radius:18px;
+
+padding:18px;
+
+margin-bottom:15px;
+
+}
+
+.user-name{
+
+font-size:20px;
+
+font-weight:bold;
+
+}
+
+.user-email{
+
+color:#aaa;
+
+margin-top:5px;
+
+}
+
+.user-role{
+
+margin-top:8px;
+
+color:#4ade80;
+
+font-weight:bold;
+
+}
+
+.user-date{
+
+margin-top:8px;
+
+color:#888;
+
+font-size:13px;
+
+}
+
+.user-actions{
+
+margin-top:15px;
+
+display:flex;
+
+gap:10px;
+
+flex-wrap:wrap;
+
+}
+
+.user-actions button{
+
+flex:1;
+
+padding:10px;
+
+border:none;
+
+border-radius:10px;
+
+font-weight:bold;
+
+cursor:pointer;
+
+}
+
+.btn-admin{
+
+background:#2563eb;
+
+color:white;
+
+}
+
+.btn-delete{
+
+background:#ef4444;
+
+color:white;
+
+}
+
+.btn-back{
+
+display:block;
+
+margin:25px auto;
+
+padding:14px 30px;
+
+background:#ff3b3b;
+
+color:white;
+
+border:none;
+
+border-radius:12px;
+
+font-weight:bold;
+
+}
+
+.modal{
+
+display:none;
+
+position:fixed;
+
+top:0;
+left:0;
+
+width:100%;
+height:100%;
+
+background:rgba(0,0,0,.6);
+
+justify-content:center;
+
+align-items:center;
+
+z-index:9999;
+
+}
+
+.modal-box{
+
+background:#111827;
+
+width:90%;
+max-width:350px;
+
+padding:20px;
+
+border-radius:18px;
+
+border:1px solid #333;
+
+}
+
+.modal-box h2{
+
+margin-bottom:20px;
+
+text-align:center;
+
+}
+
+.modal-box label{
+
+display:block;
+
+padding:10px;
+
+font-size:16px;
+
+cursor:pointer;
+
+}
+
+.modal-actions{
+
+display:flex;
+
+gap:10px;
+
+margin-top:20px;
+
+}
+
+.modal-actions button{
+
+flex:1;
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>
+👥 Kelola User
+</h1>
+
+<div id="userList">
+
+<div class="empty">
+Memuat user...
+</div>
+
+</div>
+
+<button
+class="btn-back"
+onclick="location.href='/admin'"
+>
+⬅ Kembali
+</button>
+
+</div>
+
+<script src="/public/js/config.js"></script>
+
+<script>
+
+async function loadUsers(){
+
+try{
+
+const res=
+await fetch(
+API_URL + "/api/admin/users",
+{
+credentials:"include"
+}
+);
+
+const data=
+await res.json();
+
+const list=
+document.getElementById(
+"userList"
+);
+
+list.innerHTML="";
+
+if(
+!data.users||
+data.users.length===0
+){
+
+list.innerHTML=`
+<div class="empty">
+Belum ada user
+</div>
+`;
+
+return;
+
+}
+
+data.users.forEach(user=>{
+
+const tanggal=
+new Date(
+user.joinedAt
+).toLocaleDateString(
+"id-ID"
+);
+
+list.innerHTML+=`
+
+<div class="user-card">
+
+<div class="user-name">
+${user.username}
+</div>
+
+<div class="user-email">
+${user.email}
+</div>
+
+<div class="user-role">
+
+Role :
+${user.role||"user"}
+
+${user.verified?" ✔️":""}
+
+</div>
+
+<div style="margin-top:8px;">
+
+${user.blocked
+
+?
+
+"<span style='color:#ff3b3b'>🔴 Diblokir</span>"
+
+:
+
+"<span style='color:#4ade80'>🟢 Aktif</span>"}
+
+</div>
+
+<div class="user-date">
+
+Gabung :
+${tanggal}
+
+</div>
+
+<div class="user-actions">
+
+<button
+class="btn-admin"
+onclick="changeRole(${user.id})"
+>
+👑 Role
+</button>
+
+<button
+class="btn-admin"
+onclick="blockUser(${user.id})"
+>
+
+${user.blocked
+?
+"🟢 Buka Blokir"
+:
+"🚫 Blokir"}
+
+</button>
+
+<button
+class="btn-delete"
+onclick="deleteUser(${user.id})"
+>
+🗑 Hapus
+</button>
+
+</div>
+
+</div>
+
+`;
+
+});
+
+}catch(err){
+
+console.log(err);
+
+}
+
+}
+
+function changeRole(id){
+
+document.getElementById(
+"selectedUserId"
+).value=id;
+
+document.getElementById(
+"roleModal"
+).style.display="flex";
+
+}
+
+async function deleteUser(id){
+
+if(!confirm("Hapus user ini?"))
+return;
+
+const res=
+await fetch(
+API_URL + "/api/admin/users/"+id,
+{
+method:"DELETE",
+credentials:"include"
+}
+);
+
+const data=
+await res.json();
+
+alert(data.message);
+
+if(data.success){
+loadUsers();
+}
+
+}
+
+function closeRoleModal(){
+
+document.getElementById(
+"roleModal"
+).style.display="none";
+
+}
+
+async function saveRole(){
+
+const id=
+document.getElementById(
+"selectedUserId"
+).value;
+
+const role=
+document.querySelector(
+'input[name="role"]:checked'
+).value;
+
+const res=
+await fetch(
+API_URL + "/api/admin/role/"+id,
+{
+method:"PUT",
+credentials:"include",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+role
+})
+}
+);
+
+const data=
+await res.json();
+
+alert(data.message);
+
+if(data.success){
+
+closeRoleModal();
+
+loadUsers();
+
+}
+
+}
+
+async function blockUser(id){
+
+const res=
+await fetch(
+API_URL + "/api/admin/block/"+id,
+{
+method:"PUT",
+credentials:"include"
+}
+);
+
+const data=
+await res.json();
+
+alert(data.message);
+
+if(data.success){
+
+loadUsers();
+
+}
+
+}
+
+loadUsers();
+
+</script>
+
+<div id="roleModal" class="modal">
+
+<div class="modal-box">
+
+<h2>👑 Ubah Role</h2>
+
+<input
+type="hidden"
+id="selectedUserId"
+>
+
+<label>
+<input
+type="radio"
+name="role"
+value="user"
+checked
+>
+User
+</label>
+
+<label>
+<input
+type="radio"
+name="role"
+value="moderator"
+>
+Moderator
+</label>
+
+<label>
+<input
+type="radio"
+name="role"
+value="admin"
+>
+Admin
+</label>
+
+<label>
+<input
+type="radio"
+name="role"
+value="owner"
+>
+Owner
+</label>
+
+<div class="modal-actions">
+
+<button
+class="btn-delete"
+onclick="closeRoleModal()"
+>
+Batal
+</button>
+
+<button
+class="btn-admin"
+onclick="saveRole()"
+>
+Simpan
+</button>
+
+</div>
+
+</div>
+
+</div>
+
+</body>
+</html>
