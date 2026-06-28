@@ -19,8 +19,10 @@ const typingUsers = {};
 /* =========================
    MIDDLEWARE
 ========================= */
-
-app.use(cors());
+app.use(cors({
+  origin: true,
+  credentials: true
+}));
 
 app.use(express.json({
   limit: "20mb"
@@ -34,7 +36,12 @@ app.use(
   session({
     secret: process.env.SESSION_SECRET || "marketplaceid_v3_secret_key",
     resave: false,
-    saveUninitialized: false
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: true
+    }
   })
 );
 
