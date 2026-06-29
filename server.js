@@ -1168,52 +1168,40 @@ app.post(
         location
       } = req.body;
 
-      const db =
-        await readDB(
-          "products.json"
-        );
+const images =
+  (req.files || []).map(
+    file => "/uploads/products/" + file.filename
+  );
 
-      const products =
-        db.products || [];
+const result =
+  await require("./database/postgres/db").query(
+    `
+    INSERT INTO products
+    (
+      seller_id,
+      title,
+      description,
+      category,
+      price,
+      location,
+      images
+    )
+    VALUES
+    ($1,$2,$3,$4,$5,$6,$7)
+    RETURNING *
+    `,
+    [
+      req.session.userId,
+      title,
+      description || "",
+      category,
+      Number(price),
+      location || "",
+      images
+    ]
+  );
 
-      const images =
-        (req.files || [])
-          .map(
-            file =>
-              "/uploads/products/" +
-              file.filename
-          );
-
-      const product = {
-        id: generateId(),
-        sellerId:
-          req.session.userId,
-        title,
-        price:
-          Number(price),
-        category,
-        description:
-          description || "",
-        location:
-          location || "",
-        latitude: 0,
-        longitude: 0,
-        images,
-        views: 0,
-        favorites: 0,
-        status: "active",
-        createdAt:
-          Date.now()
-      };
-
-      products.push(
-        product
-      );
-
-      await writeDB(
-        "products.json",
-        { products }
-      );
+const product = result.rows[0];
 
       res.json({
         success: true,
