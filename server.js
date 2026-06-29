@@ -719,7 +719,7 @@ await db.query(
 ========================= */
 
 app.get(
-  "/api/me"
+  "/api/me",
   requireLogin,
   async (req, res) => {
 
