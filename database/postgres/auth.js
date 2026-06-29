@@ -52,7 +52,8 @@ async function userExists(username, email) {
 module.exports = {
   registerUser,
   findUser,
-  userExists
+  userExists,
+updateLastActive
 };
 
 async function registerUser(username, email, password) {
@@ -74,4 +75,17 @@ async function registerUser(username, email, password) {
   console.log("Insert berhasil:", result.rows[0]);
 
   return result.rows[0];
+}
+
+async function updateLastActive(userId) {
+
+  await db.query(
+    `
+    UPDATE users
+    SET last_active = NOW()
+    WHERE id = $1
+    `,
+    [userId]
+  );
+
 }

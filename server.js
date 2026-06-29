@@ -680,13 +680,8 @@ if(user.blocked){
         user.id;
 
       /* UPDATE LAST ACTIVE */
-await db.query(
-  `
-  UPDATE users
-  SET last_active = NOW()
-  WHERE id = $1
-  `,
-  [user.id]
+await authDB.updateLastActive(
+  user.id
 );
 
       res.json({
