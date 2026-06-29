@@ -53,7 +53,8 @@ module.exports = {
   registerUser,
   findUser,
   userExists,
-updateLastActive
+updateLastActive,
+getUserById
 };
 
 async function registerUser(username, email, password) {
@@ -88,4 +89,19 @@ async function updateLastActive(userId) {
     [userId]
   );
 
+}
+
+async function getUserById(id) {
+
+  const result = await db.query(
+    `
+    SELECT *
+    FROM users
+    WHERE id = $1
+    LIMIT 1
+    `,
+    [id]
+  );
+
+  return result.rows[0];
 }

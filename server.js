@@ -718,35 +718,39 @@ app.get(
   requireLogin,
   async (req, res) => {
 
-    const db =
-      await readDB(
-        "users.json"
-      );
+    try {
 
-const user =
-  (
-    db.users || []
-  ).find(
-    u =>
-      u.id ===
-      req.session.userId
-  );
+      const user =
+        await authDB.getUserById(
+          req.session.userId
+        );
 
-if (!user) {
+      if (!user) {
 
-  return res.status(404).json({
-    success: false,
-    message:
-      "User tidak ditemukan"
-  });
+        return res.status(404).json({
+          success: false,
+          message: "User tidak ditemukan"
+        });
 
-}
+      }
 
-res.json({
-  success: true,
-  user
-});
-}
+      res.json({
+        success: true,
+        user
+      });
+
+    } catch (err) {
+
+      console.error(err);
+
+      res.status(500).json({
+        success: false,
+        message: err.message
+      });
+
+    }
+
+  }
 );
 
 /* =========================
