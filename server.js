@@ -625,6 +625,8 @@ app.post(
   "/api/login",
   async (req, res) => {
 
+console.log("LOGIN:", req.body);
+
     try {
 
       const {
@@ -636,6 +638,8 @@ app.post(
   await authDB.findUser(
     login
   );
+
+console.log("USER:", user);
 
       if (!user) {
 
@@ -696,13 +700,17 @@ await db.query(
         }
       });
 
-    } catch {
+} catch (err) {
 
-      res.status(500).json({
-        success: false
-      });
+  console.error(err);
 
-    }
+  res.status(500).json({
+    success: false,
+    message: err.message
+  });
+
+}
+
   }
 );
 
@@ -711,7 +719,7 @@ await db.query(
 ========================= */
 
 app.get(
-  "/api/me",
+  "/api/me"
   requireLogin,
   async (req, res) => {
 
