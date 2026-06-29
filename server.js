@@ -632,22 +632,10 @@ app.post(
         password
       } = req.body;
 
-      const db =
-        await readDB(
-          "users.json"
-        );
-
-      const users =
-        db.users || [];
-
       const user =
-        users.find(
-          u =>
-            u.username ===
-              login ||
-            u.email ===
-              login
-        );
+  await authDB.findUser(
+    login
+  );
 
       if (!user) {
 
@@ -688,12 +676,13 @@ if(user.blocked){
         user.id;
 
       /* UPDATE LAST ACTIVE */
-user.lastActive =
-  Date.now();
-
-await writeDB(
-  "users.json",
-  { users }
+await db.query(
+  `
+  UPDATE users
+  SET last_active = NOW()
+  WHERE id = $1
+  `,
+  [user.id]
 );
 
       res.json({
