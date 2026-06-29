@@ -10,20 +10,8 @@ const fs = require("fs-extra");
 const path = require("path");
 const bcrypt = require("bcryptjs");
 const multer = require("multer");
-const { Pool } = require("pg");
 
 const app = express();
-
-const db = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false
-  }
-});
-
-db.connect()
-  .then(() => console.log("PostgreSQL Connected"))
-  .catch(err => console.error(err));
 
 const PORT = process.env.PORT || 3000;
 
